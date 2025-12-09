@@ -1,5 +1,5 @@
-# Create image based on the official PHP-FMP image
-FROM php:8.0-fpm-alpine AS base-stage
+    # Create image based on the official PHP-FMP image
+FROM php:5.6-fpm-alpine AS base-stage
 
 # Arguments defined in docker-compose.yml
 ARG uid
@@ -11,18 +11,17 @@ RUN apk update && apk upgrade
 RUN apk add --no-cache \
     git nano wget dialog bash \
     build-base \
-    gettext-dev \
     zip openssl curl \
-    libmcrypt \
-    freetype \
-    freetype-dev \
-    libjpeg-turbo-dev \
-    libjpeg-turbo \
-    libpng \
-    libxpm \
+    libmcrypt libmcrypt-dev\
+    libvpx \
+    gettext gettext-dev \
+    freetype freetype-dev \
+    libjpeg-turbo libjpeg-turbo-dev \
+    libpng libpng-dev \
+    libxpm libxpm-dev\
+    libvpx-dev \
     sqlite-dev \
     mariadb-client \
-    libpng-dev \
     zlib-dev \
     libzip-dev \
     icu-dev \
@@ -30,19 +29,28 @@ RUN apk add --no-cache \
     oniguruma-dev \
     curl-dev \
     libmemcached-dev
-    
-# Other PHP5.6 Extensions
+
+
+# Other PHP Extensions
 RUN echo "Installing PHP extensions" && \
-    docker-php-ext-install pdo pdo_mysql mysqli curl tokenizer zip mbstring gettext opcache && \
-    docker-php-ext-configure \
-        # ref: https://github.com/docker-library/php/issues/920#issuecomment-562864296
-        gd --enable-gd --with-freetype --with-jpeg --with-webp && \
+    docker-php-ext-install pdo_mysql && \
+    docker-php-ext-install pdo_sqlite && \
+    docker-php-ext-install mysqli && \
+    docker-php-ext-install curl && \
+    docker-php-ext-install tokenizer && \
+    docker-php-ext-install json && \
+    docker-php-ext-install zip && \
+    docker-php-ext-install mbstring && \
+    docker-php-ext-install gettext && \
+    docker-php-ext-install mcrypt  && \
+    docker-php-ext-install opcache && \
+    docker-php-ext-configure gd --with-freetype-dir=/usr/include/ --with-jpeg-dir=/usr/include/ --with-xpm-dir=/usr/include/ --with-vpx-dir=/usr/include/ && \
     docker-php-ext-install gd
 
-# Other PHP5.6 Extensions
+# Other PHP Extensions
 RUN echo "Enabling PHP extensions" && \
     docker-php-ext-enable pdo_mysql && \
-    docker-php-ext-enable pdo && \
+    docker-php-ext-enable pdo_sqlite && \
     docker-php-ext-enable mysqli && \
     docker-php-ext-enable zip
 
@@ -66,7 +74,6 @@ RUN apk del \
  && rm -rf /var/cache/apk/* \
  && rm -rf /tmp/*
 
-
 # -------------------------------------------------------
 # SERVE STAGE
 # -------------------------------------------------------
@@ -82,12 +89,14 @@ RUN apk update && apk add --no-cache \
     nginx \
     memcached
 
+RUN mkdir -p /run/nginx
+
 # Clean up, try to reduce image size
 RUN rm -rf /var/cache/apk/* \
     && rm -rf /tmp/*
 
 # Copy nginx config
-COPY .docker/services/webserver/config/sites-available/default.nginx /etc/nginx/http.d/default.conf
+COPY .docker/services/webserver/config/sites-available/default.nginx /etc/nginx/conf.d/default.conf
 
 # Copy entrypoint
 COPY .docker/services/webserver/entrypoint.sh /usr/local/bin/

@@ -1,9 +1,8 @@
 services:
-
   webserver:
     build:
       context: "${STACK_DIR}"
-      dockerfile: "${STACK_DIR}/.docker/services/webserver/version/${PHP_VERSION}/Dockerfile"
+      dockerfile: "${STACK_DIR}/.docker/services/webserver/version/${PHP_VERSION}.Dockerfile"
       args:
         uid: "${PHP_UID}"
     image: "${PROJECT}_webserver"
