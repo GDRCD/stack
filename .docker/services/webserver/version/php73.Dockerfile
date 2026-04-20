@@ -93,6 +93,9 @@ RUN rm -rf /var/cache/apk/* \
 # Copy nginx config
 COPY .docker/services/webserver/config/sites-available/default.nginx /etc/nginx/http.d/default.conf
 
+# Set cache directory permissions
+RUN mkdir -p /var/www/html/cache && chown www-data:www-data /var/www/html/cache
+
 # Copy entrypoint
 COPY .docker/services/webserver/entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/entrypoint.sh
