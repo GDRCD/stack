@@ -12,22 +12,22 @@ CURRENT_FILE_NAME="$(basename "${BASH_SOURCE[0]}")"
 # Save command name
 args=("$@")
 COMMAND_NAME="${args[0]}"
-
+SERVICE_NAMES=()
 # ---------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------
 
 # Function for showing usage of this command
 usage() {
-  helpify_title "build"
-  helpify_subtitle "Building all containers"; echo;
+  helpify_title "build " "[OPTIONS...] [<service>...]"
+  helpify_subtitle "Building all containers or only the specified ones"; echo;
   helpify_subtitle "OPTIONS:"
-  helpify "-h, --help"             "Show this help"
+  helpify "-h, --help"          "Show this help"
 }
 
 # Function for showing usage of this command for help
 usage4help() {
-  helpify "build"       "Building all containers"
+  helpify "build" "Building all containers or only the specified ones"
 }
 
 # ---------------------------------------------------------------------
@@ -40,15 +40,25 @@ usage4help() {
 while [[ $# -gt 0 ]]; do
   # if the argument is the command name, skip it
   if [[ "$1" == "${COMMAND_NAME}" ]]; then
-    shift; continue
+    shift
+    continue
   fi
 
   #
   case "$1" in
-    -h|--help)
-      need_help="true"; shift ;;
-    *)
-      messageUnknownCommand "$COMMAND_NAME" "$1"; exit 1;;
+  -h | --help)
+    need_help="true"
+    shift
+    ;;
+  *)
+    if isServiceCommand $1; then
+      SERVICE_NAMES+=("$1")
+      shift
+    else
+      messageUnknownCommand "$COMMAND_NAME" "$1"
+      exit 1
+    fi
+    ;;
   esac
 done
 
@@ -58,11 +68,20 @@ finalize_argument_parsing
 #---------------------------RUN COMMAND-------------------------------#
 
 build() {
-  prompt -i "Building all containers..."
-  dockerCompose rm -s -f && dockerCompose build --no-cache && dockerCompose up -d
+
+  if [[ ${#SERVICE_NAMES[@]} -eq 0 ]]; then
+    prompt -i "Building all containers..."
+    dockerCompose rm -s -f && dockerCompose build --no-cache && dockerCompose up -d
+  else
+    for SERVICE_NAME in "${SERVICE_NAMES[@]}"; do
+      prompt -i "Building ${SERVICE_NAME} image and container..."
+      dockerCompose rm -s -f "${SERVICE_NAME}" && dockerCompose build --no-cache "${SERVICE_NAME}" && dockerCompose up -d "${SERVICE_NAME}"
+    done
+  fi
+
 }
 
 # Run command if this file is the command file
 if [[ "${COMMAND_NAME}" == "${CURRENT_FILE_NAME}" ]]; then
-	build
+  build
 fi
