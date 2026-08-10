@@ -64,3 +64,8 @@ services:
 volumes:
   database-data:
   www-cache:
+
+# Networks
+networks:
+  default:
+    name: "${PROJECT}_network"
