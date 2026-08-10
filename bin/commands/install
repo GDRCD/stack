@@ -17,13 +17,13 @@ COMMAND_NAME="${args[0]}"
 # Messages
 # ---------------------------------------------------------------------
 
-MESSAGE_INSTALL_START="Starting installation...";
-MESSAGE_INSTALL_ALREADY_INSTALLED="Already installed!";
-MESSAGE_INSTALL_SUCCESS="Installation completed!";
-MESSAGE_INSTALL_FAILED="Installation failed!";
+MESSAGE_INSTALL_START="Starting installation"
+MESSAGE_INSTALL_ALREADY_INSTALLED="Already installed!"
+MESSAGE_INSTALL_SUCCESS="Installation completed!"
+MESSAGE_INSTALL_FAILED="Installation failed!"
 
-MESSAGE_TARGET_NOT_WRITABLE="Target path is not writable with the current user, please check the permissions or run the script as root";
-MESSAGE_TARGET_NOT_DIRECTORY="Target path is not a directory, please check the path or run the script as root";
+MESSAGE_TARGET_NOT_WRITABLE="Target path is not writable with the current user, please check the permissions or run the script as root"
+MESSAGE_TARGET_NOT_DIRECTORY="Target path is not a directory, please check the path or run the script as root"
 
 # ---------------------------------------------------------------------
 # Helpers
@@ -31,15 +31,16 @@ MESSAGE_TARGET_NOT_DIRECTORY="Target path is not a directory, please check the p
 
 usage() {
   helpify_title "install" "[OPTIONS...]"
-  helpify_subtitle "Install the GDRCD development stack"; echo;
+  helpify_subtitle "Installing GDRCD development stack"
+  echo
   helpify_subtitle "OPTIONS:"
-  helpify "-h, --help"          "Show this help"
-  helpify "-t, --target"        "Set the global command installation path"      "[/usr/local/bin]"
-  helpify "-f, --force"         "Force reinstallation of global command"
+  helpify "-h, --help" "Show this help"
+  helpify "-t, --target" "Set the global command installation path" "[default: $HOME/.local/bin]"
+  helpify "-f, --force" "Force reinstallation of global command"
 }
 
 usage4help() {
-  helpify "install"       "Installing the GDRCD development stack"
+  helpify "install" "Installing the GDRCD development stack"
 }
 
 # ---------------------------------------------------------------------
@@ -49,25 +50,38 @@ usage4help() {
 #---------------------------PARSE ARGUMENTS-------------------------------#
 
 # Set default values
-target="/usr/local/bin"
+target="$HOME/.local/bin"
 force_reinstall="false"
+
+# Create the target directory if it does not exist
+mkdir -p "$target"
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
   # if the argument is the command name, skip it
   if [[ "$1" == "${COMMAND_NAME}" ]]; then
-    shift; continue
+    shift
+    continue
   fi
 
   case "${1}" in
-    -h|--help)
-      need_help="true"; shift ;;
-    -t|--target)
-      target="${2}"; shift; shift ;;
-    -f|--force)
-      force_reinstall="true"; shift ;;
-    *)
-      messageUnknownCommand "$COMMAND_NAME" "$1"; exit 1;;
+  -h | --help)
+    need_help="true"
+    shift
+    ;;
+  -t | --target)
+    target="${2}"
+    shift
+    shift
+    ;;
+  -f | --force)
+    force_reinstall="true"
+    shift
+    ;;
+  *)
+    messageUnknownCommand "$COMMAND_NAME" "$1"
+    exit 1
+    ;;
   esac
 done
 
@@ -77,52 +91,64 @@ finalize_argument_parsing
 #---------------------------RUN COMMAND-------------------------------#
 
 install() {
-  message --magenta "${MESSAGE_INSTALL_START}";
+  message --stack "${MESSAGE_INSTALL_START} in ${target}"
 
   # Check if the target path is a directory
   if [[ ! -d "$target" ]]; then
-    message --error "${MESSAGE_TARGET_NOT_DIRECTORY}";
-    exit 1;
-  fi;
+    message --error "${MESSAGE_TARGET_NOT_DIRECTORY}"
+    exit 1
+  fi
 
-    # Check if the target path is writable
-    if [[ ! -w "$target" ]]; then
-      message --error "${MESSAGE_TARGET_NOT_WRITABLE}";
-      exit 1;
-    fi;
+  # Check if the target path is writable
+  if [[ ! -w "$target" ]]; then
+    message --error "${MESSAGE_TARGET_NOT_WRITABLE}"
+    exit 1
+  fi
 
-  # Check if stack is already installed
-  if [[ -f "${target}/${PROJECT}" ]]; then
+  # Set final command name
+  local final_command_name="${PROJECT:-${STACK_COMMAND_NAME}}"
+
+  # Check if gdrcd is already installed
+  if [[ -f "${target}/${final_command_name}" ]]; then
     if [[ "${force_reinstall}" == "true" ]]; then
-      rm -f "${target}/${PROJECT}";
+      rm -f "${target}/${final_command_name}"
     else
-      message --error "${MESSAGE_INSTALL_ALREADY_INSTALLED}";
-      exit 1;
-    fi;
-  fi;
+      message --error "${MESSAGE_INSTALL_ALREADY_INSTALLED}"
+      exit 1
+    fi
+  fi
 
-  # Create the target path if it does not exist
-  if [[ ! -d "$target" ]]; then
-    mkdir -p "$target";
-  fi;
+  # Check if the target path is present on the PATH variable, if not add it to the .*rc file
 
-  # Create link to the stack binary
-  ln -sf "${STACK_DIR}/run" "$target/${PROJECT}" 2>/dev/null;
+  # if macos, add to .zshrc file
+  if [[ "$(uname)" == "Darwin" ]]; then
+    if [[ ":$PATH:" != *":${target}:"* ]]; then
+      echo "export PATH=\"${target}:\$PATH\"" >>"$HOME/.zshrc"
+      message --info "Added ${target} to PATH in .zshrc file. Please restart your terminal or run 'source ~/.zshrc' to apply the changes."
+    fi
+  else
+    if [[ ":$PATH:" != *":${target}:"* ]]; then
+      echo "export PATH=\"${target}:\$PATH\"" >>"$HOME/.bashrc"
+      message --info "Added ${target} to PATH in .bashrc file. Please restart your terminal or run 'source ~/.bashrc' to apply the changes."
+    fi
+  fi
+
+  # Create link to the gdrcd binary
+  ln -sf "${STACK_DIR}/${STACK_COMMAND_NAME}" "$target/${final_command_name}" 2>/dev/null
 
   # Set the permissions
-  chmod +x "$target/${PROJECT}";
+  chmod +x "$target/${final_command_name}"
 
   # Check if the installation was successful
-  if [[ -f "$target/${PROJECT}" ]]; then
-    message --success "${MESSAGE_INSTALL_SUCCESS}";
+  if [[ -f "$target/${final_command_name}" ]]; then
+    message --success "${MESSAGE_INSTALL_SUCCESS}"
   else
-    message --error "${MESSAGE_INSTALL_FAILED}";
-    exit 1;
-  fi;
+    message --error "${MESSAGE_INSTALL_FAILED}"
+    exit 1
+  fi
 }
 
 # Run command if this file is the command file
 if [[ "${COMMAND_NAME}" == "${CURRENT_FILE_NAME}" ]]; then
-  logo;
-  install;
+  install
 fi

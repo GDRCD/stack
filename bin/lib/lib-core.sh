@@ -44,32 +44,15 @@ need_help="false"
 need_usage4help="false"
 has_any_error="false"
 
-# ---------------------------------------------------------------------
-# Utilities
-# ---------------------------------------------------------------------
-
-getVersion() {
-  cat "${STACK_DIR}/version" | tr -d 'v'
-}
-
-checkVersion() {
-  # Get the version from version file
-  local version
-  version=$(cat "${STACK_DIR}/version" | tr -d 'v')
-
-  # Check if the version is the latest check last release on github
-  local latest_version
-  latest_version=$(curl -s "https://github.com/GDRCD/stack/releases" | grep -o "v[0-9]*\.[0-9]*\.[0-9]*" | head -n 1 | tr -d 'v')
-
-  # Remove the point from the version and compare the two versions
-  if [[ "${version//./}" -lt "${latest_version//./}" ]]; then
-    prompt -w "Warning! A new version is available. Please update the stack."
-    prompt -w "Current version: ${version} - Latest version: ${latest_version}"
-  fi
-}
+# -----------Services--------------#
+CORE_HANDLER=("service")
 
 # ---------------------------------------------------------------------
-# Imports Methods
+# Messages
+# ---------------------------------------------------------------------
+
+# ---------------------------------------------------------------------
+# Import Libraries
 # ---------------------------------------------------------------------
 
 importLib() {
@@ -87,14 +70,7 @@ importLib() {
   fi
 }
 
-importEnv() {
-  # Check if env file exists
-  if [[ ! -f "${STACK_DIR}/.env" ]]; then
-    prompt -e "Error! '.env' file is not found. Please create it first."
-    exit 1
-  fi
-
-  # shellcheck source=.env
-  source "${STACK_DIR}/.env"
-}
+# ---------------------------------------------------------------------
+# Commands
+# ---------------------------------------------------------------------
 

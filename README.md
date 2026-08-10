@@ -51,7 +51,7 @@ Di seguito le versioni attualmente supportate, con i relativi riferimenti:
 Per proseguire con l'installazione, occorre eseguire il comando di installazione con i permessi di amministratore:
 
 ```shell
-sudo ./run install
+sudo ./stack install
 ```
 
 > N.B.: è possibile configurare il percorso in cui installare il comando globale aggiungendo l'opzione `-t` dopo [`bin/commands/install`](bin/commands/install) seguito dal percorso desiderato. Di default, il comando viene installato in [`/usr/local/bin/`](/usr/local/bin/).
@@ -74,7 +74,7 @@ mygdrcd <comando>
 al posto di:
 
 ```shell
-./run <comando>
+./stack <comando>
 ```
 
 Ora il tuo **_stack_** è pronto e funzionante!
@@ -137,13 +137,13 @@ Per facilitare l'utilizzo dello strumento, è stato predisposto il comando `run`
 Il comando non è altro che un file eseguibile da terminale, motivo per il quale è necessario usare la formula:
 
 ```shell
-./run <comando>
+./stack <comando>
 ```
 
 Per avviare l'esecuzione dei servizi dello **_stack_**, sarà sufficiente eseguire il seguente comando:
 
 ```shell
-./run start
+./stack start
 ```
 
 In automatico avverrà la compilazione dello **_stack_**, processo che si occuperà di costruire i singoli servizi e di istanziarli in appositi container di docker, e l'avvio dei servizi.
@@ -151,7 +151,7 @@ In automatico avverrà la compilazione dello **_stack_**, processo che si occupe
 La compilazione dello stack può essere effettuata manualmente in qualsiasi momento, attraverso il comando:
 
 ```shell
-./run build
+./stack build
 ```
 
 Ciò può essere utile qualora vengono apportate modifiche allo **_stack_**, come ad esempio una modifica alla versione PHP utilizzata, o se si desidera aggiungere nuovi servizi.
@@ -159,13 +159,13 @@ Ciò può essere utile qualora vengono apportate modifiche allo **_stack_**, com
 Per fermare i servizi dello **_stack_**, è sufficiente eseguire il seguente comando:
 
 ```shell
-./run stop
+./stack stop
 ```
 
 Assieme a questi comandi, è stato predisposto anche un comando per rimuovere compleatamente lo **_stack_**, in modo da poterne ricominciare da capo:
 
 ```shell
-./run clean
+./stack clean
 ```
 
 ## Comandi Utili
@@ -173,29 +173,29 @@ Assieme a questi comandi, è stato predisposto anche un comando per rimuovere co
 Di seguito i comandi a disposizione:
 
 ```shell
-./run start # avvia lo stack
-./run stop # ferma lo stack
-./run restart # riavvia lo stack
-./run build # compila lo stack
-./run clean # rimuove tutti tutti i servizi generati dallo stack
-./run help # mostra i comandi a disposizione
+./stack start # avvia lo stack
+./stack stop # ferma lo stack
+./stack restart # riavvia lo stack
+./stack build # compila lo stack
+./stack clean # rimuove tutti tutti i servizi generati dallo stack
+./stack help # mostra i comandi a disposizione
 ```
 
 ## Dettaglio dei Comandi
 
-`./run start`
+`./stack start`
 
 Avvia tutti i container dello stack.
 
-`./run stop`
+`./stack stop`
 
 Ferma tutti i container dello stack.
 
-`./run restart`
+`./stack restart`
 
 Riavvia tutti i container dello stack.
 
-`./run build`
+`./stack build`
 
 Compila tutti i container dello stack.
 
@@ -203,7 +203,7 @@ Opzioni disponibili:
 
 - `-f, --force`: Forza la ricompilazione dei container
 
-`./run clean`
+`./stack clean`
 
 Rimuove tutti i container dello stack.
 
@@ -211,7 +211,7 @@ Opzioni disponibili:
 
 - `-v, --volumes`: Rimuove anche i volumi associati ai container
 
-`./run logs`
+`./stack logs`
 
 Mostra i log di tutti i container dello stack.
 
@@ -219,7 +219,7 @@ Opzioni disponibili:
 
 - `-f, --follow`: Segue i log in tempo reale
 
-`./run recreate`
+`./stack recreate`
 
 Ricrea tutti i container e le reti dello stack.
 
@@ -227,7 +227,7 @@ Opzioni disponibili:
 
 - `-f, --force`: Forza la ricreazione dei container
 
-`sudo ./run install`
+`sudo ./stack install`
 
 Installa lo stack e crea un alias di sistema per il progetto.
 
@@ -236,19 +236,19 @@ Opzioni disponibili:
 - `-t, --target <path>`: Specifica il percorso di installazione del comando globale (default: [`/usr/local/bin/`](/usr/local/bin/))
 - `-f, --force`: Forza la reinstallazione del comando globale
 
-`./run service list`
+`./stack service list`
 
 Elenca tutti i servizi opzionali disponibili.
 
-`./run service enable <service>`
+`./stack service enable <service>`
 
 Abilita un servizio opzionale.
 
-`./run service disable <service>`
+`./stack service disable <service>`
 
 Disabilita un servizio opzionale.
 
-`./run database logs`
+`./stack database logs`
 
 Mostra i log del container `database`.
 
@@ -256,19 +256,19 @@ Opzioni disponibili:
 
 - `-f, --follow`: Segue i log in tempo reale
 
-`./run database start`
+`./stack database start`
 
 Avvia il container `database`.
 
-`./run database stop`
+`./stack database stop`
 
 Ferma il container `database`.
 
-`./run database restart`
+`./stack database restart`
 
 Riavvia il container `database`.
 
-`./run database build`
+`./stack database build`
 
 Compila il container `database`.
 
@@ -276,7 +276,7 @@ Opzioni disponibili:
 
 - `-f, --force`: Forza la ricompilazione del container
 
-`./run database attach`
+`./stack database attach`
 
 Accede alla shell del container `database`.
 
@@ -300,7 +300,7 @@ Opzioni disponibili:
 
 Pulisce tutte le tabelle nel database.
 
-`./run webserver logs`
+`./stack webserver logs`
 
 Mostra i log del container `webserver`.
 
@@ -308,19 +308,19 @@ Opzioni disponibili:
 
 - `-f, --follow`: Segue i log in tempo reale
 
-`./run webserver start`
+`./stack webserver start`
 
 Avvia il container `webserver`.
 
-`./run webserver stop`
+`./stack webserver stop`
 
 Ferma il container `webserver`.
 
-`./run webserver restart`
+`./stack webserver restart`
 
 Riavvia il container `webserver`.
 
-`./run webserver build`
+`./stack webserver build`
 
 Compila il container `webserver`.
 
@@ -328,11 +328,11 @@ Opzioni disponibili:
 
 - `-f, --force`: Forza la ricompilazione del container
 
-`./run webserver attach`
+`./stack webserver attach`
 
 Accede alla shell del container `webserver`.
 
-`./run phpmyadmin logs`
+`./stack phpmyadmin logs`
 
 Mostra i log del container `phpmyadmin`.
 
@@ -340,19 +340,19 @@ Opzioni disponibili:
 
 - `-f, --follow`: Segue i log in tempo reale
 
-`./run phpmyadmin start`
+`./stack phpmyadmin start`
 
 Avvia il container `phpmyadmin`.
 
-`./run phpmyadmin stop`
+`./stack phpmyadmin stop`
 
 Ferma il container `phpmyadmin`.
 
-`./run phpmyadmin restart`
+`./stack phpmyadmin restart`
 
 Riavvia il container `phpmyadmin`.
 
-`./run phpmyadmin build`
+`./stack phpmyadmin build`
 
 Compila il container `phpmyadmin`.
 
@@ -360,11 +360,11 @@ Opzioni disponibili:
 
 - `-f, --force`: Forza la ricompilazione del container
 
-`./run phpmyadmin attach`
+`./stack phpmyadmin attach`
 
 Accede alla shell del container `phpmyadmin`.
 
-`./run mailhog logs`
+`./stack mailhog logs`
 
 Mostra i log del container `mailhog`.
 
@@ -372,19 +372,19 @@ Opzioni disponibili:
 
 - `-f, --follow`: Segue i log in tempo reale
 
-`./run mailhog start`
+`./stack mailhog start`
 
 Avvia il container `mailhog`.
 
-`./run mailhog stop`
+`./stack mailhog stop`
 
 Ferma il container `mailhog`.
 
-`./run mailhog restart`
+`./stack mailhog restart`
 
 Riavvia il container `mailhog`.
 
-`./run mailhog build`
+`./stack mailhog build`
 
 Compila il container `mailhog`.
 
@@ -392,7 +392,7 @@ Opzioni disponibili:
 
 - `-f, --force`: Forza la ricompilazione del container
 
-`./run mailhog attach`
+`./stack mailhog attach`
 
 Accede alla shell del container `mailhog`.
 

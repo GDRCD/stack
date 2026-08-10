@@ -1,15 +1,5 @@
 #!/usr/bin/env bash
 
-################################################################################
-
-# WARNING: Please make this shell not working-directory dependant, for example
-# instead of using 'ls blabla', use 'ls "${STACK_DIR}/blabla"'
-#
-# WARNING: Don't use "cd" in this shell, use it in a subshell instead,
-# for example ( cd blabla && do_blabla ) or $( cd .. && do_blabla )
-
-################################################################################
-
 # ---------------------------------------------------------------------
 # Variables
 # ---------------------------------------------------------------------
@@ -52,8 +42,6 @@ usage () {
 
   # add logo
   logo
-  # add version info (use function getVersion)
-  versionInfo
 
   echo;
 
@@ -86,16 +74,16 @@ usageService () {
 # Main
 # -----------------------------------------------------------------------------
 
-# Get environment variables
-importEnv
-
-# Check if the version is up to date
-checkVersion
+echo;
 
 # If no arguments are passed, show usage
 if [[ $# -eq 0 ]]; then
   need_help="true";
 fi
+
+# Get environment variables
+# shellcheck disable=SC1090
+source "${STACK_DIR}/.env"
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do

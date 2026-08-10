@@ -15,10 +15,24 @@ fi
 
 # Add lib-core.sh to the list of imported files
 PROCESS_SOURCE=("$LIB_NAME")
+# Set the command name
+STACK_COMMAND_NAME="$(basename "${0}")"
+
+# ---------------------------------------------------------------------
+# Variables
+# ---------------------------------------------------------------------
 
 # ---------------------------------------------------------------------
 # Utilities
 # ---------------------------------------------------------------------
+
+# Check if env file exists
+isEnvFileExists() {
+  if [[ ! -f "${STACK_DIR}/.env" ]]; then
+    prompt -e "Error! '.env' file is not found. Please create it first."
+    exit 1
+  fi
+}
 
 # Check if docker is installed
 isDockerInstalled() {
@@ -44,9 +58,9 @@ isDockerRunning() {
   fi
 }
 
-# Checks if a Docker container exists by name or for all services in SERVICES array.
+# Check if container network exists
 isContainerExist() {
-  # if container name is passed as argument, check if it exists
+  # if container name is passed as argument, i check if it exists
   if [[ "$1" ]]; then
     if [[ ! "$(docker ps -aq -f name="${PROJECT}_$1")" ]] && [[ ! "$(docker ps -aq -f name="${PROJECT}_$1")" ]]; then
       prompt -e "Error! Container '${PROJECT}_$1' is not found."
@@ -54,30 +68,37 @@ isContainerExist() {
     fi
     return 0;
   fi
-  # otherwise, check if all containers exist
+
+  # otherwise, i check if at least one container exists
+  local found=0
   for service in "${SERVICES[@]}"; do
     # database
     if [[ "$service" == "database" ]]; then
-      if [[ ! "$(docker ps -aq -f name="${PROJECT}_$service")" ]]; then
-        prompt -e "Error! Container '${PROJECT}_$service' is not found."
-        exit 1
+      if [[ "$(docker ps -aq -f name="${PROJECT}_$service")" ]]; then
+        found=1
+        break
       fi
       continue
     fi
 
     # other services
-    if [[ ! "$(docker ps -aq -f name="${PROJECT}_$service")" ]]; then
-      prompt -e "Error! Container '${PROJECT}_$service' is not found."
-      exit 1
+    if [[ "$(docker ps -aq -f name="${PROJECT}_$service")" ]]; then
+      found=1
+      break
     fi
   done
+
+  if [[ $found -eq 0 ]]; then
+    prompt -e "Error! No containers found for project '${PROJECT}'."
+    exit 1
+  fi
 }
 
-# Checks if a specific container or all containers are running and exits with an error if any are not.
+# Check if container is running
 isContainerRunning() {
   # if container name is passed as argument, i check if it's running
   if [[ "$1" ]]; then
-    if [[ ! "$(docker ps -q -f name="${PROJECT}_$1")" ]] && [[ ! "$(docker ps -q -f name="${PROJECT}_$1")" ]]; then
+    if [[ ! "$(docker ps -q -f name="${PROJECT}_$1")" ]]; then
       prompt -e "Error! Container '${PROJECT}_$1' is not running."
       exit 1
     fi
@@ -102,6 +123,14 @@ isContainerRunning() {
   done
 }
 
+# Check if docker network exists, otherwise create it
+isStackNetworkExists() {
+  if [[ ! "$(docker network ls -q -f name=${PROJECT}_network)" ]]; then
+    prompt -i "Creating '${PROJECT}_network' docker network... "
+    docker network create --driver bridge "${PROJECT}_network"
+  fi
+}
+
 # ---------------------------------------------------------------------
 # Commands
 # ---------------------------------------------------------------------
@@ -111,8 +140,12 @@ dockerCompose() {
   isDockerComposeInstalled
   # Check if docker is running
   isDockerRunning
+  # Check if env file exists
+  isEnvFileExists
+  # Check if stack network exists, otherwise create it
+  isStackNetworkExists
 
-  # Costruisci array dei profili attivi
+  # Build profiles array based on enabled services
   profiles=()
   for service in "phpmyadmin" "mailhog"; do
     if isServiceEnabled "$service"; then
@@ -120,6 +153,6 @@ dockerCompose() {
     fi
   done
 
-  export STACK_DIR
+  export STACK_DIR ;
   docker compose -p "${PROJECT}" -f "$DOCKER_DIR/compose.yml" --env-file "$STACK_DIR/.env" "${profiles[@]}" "$@"
 }

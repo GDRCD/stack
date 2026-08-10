@@ -15,12 +15,12 @@ fi
 
 # Add lib-core.sh to the list of imported files
 PROCESS_SOURCE=("$LIB_NAME")
+# Set the command name
+STACK_COMMAND_NAME="$(basename "${0}")"
 
 # ---------------------------------------------------------------------
 # Variables
 # ---------------------------------------------------------------------
-
-CORE_HANDLER=("service")
 
 # ---------------------------------------------------------------------
 # Commands
@@ -71,7 +71,7 @@ hasCommands() {
 # Usage
 # ---------------------------------------------------------------------
 
-# Show commands
+# Show commands for $STACK_COMMAND_NAME
 usageCommands () {
   helpify_subtitle "COMMANDS:";
 
@@ -129,8 +129,7 @@ usageSubDirCommands () {
   fi
 
   # show title
-  local command_name="$(basename "${0}")"
-  echo; helpify_subcommand_title "${command_name} ${subCommand}" "" "[OPTIONS...] COMMAND [OPTIONS...]";
+  echo; helpify_subcommand_title "${STACK_COMMAND_NAME} ${subCommand}" "" "[OPTIONS...] COMMAND [OPTIONS...]";
 
   # scan bin sub-directories for commands
   for command in "${subDirCommand}"/*; do
@@ -158,7 +157,7 @@ usageSubDirCommands () {
 messageUnknownCommand () {
   # show error
   prompt -e "Unknown argument: $2";
-  prompt -i "Try './run $1 --help' for more information.";
+  prompt -i "Try '${STACK_COMMAND_NAME} $1 --help' for more information.";
 }
 
 # ---------------------------------------------------------------------
@@ -169,19 +168,19 @@ messageUnknownCommand () {
 finalize_argument_parsing() {
   # if has_any_error is true, exit with error code
   if [[ "${has_any_error}" == "true" ]]; then
-    prompt -i "Try './run --help' for more information."; exit 1
+    prompt -i "Try '${STACK_COMMAND_NAME} --help' for more information."; exit 1
   fi
 
   if [[ "${need_help}" == "true" ]]; then
     # Force to stop the script
     forceStop="true"
 
-    # HELP > stack
-    if [[ "${need_usage4help}" == "true" && "${1}" != "run" ]]; then
+    # HELP > $STACK_COMMAND_NAME
+    if [[ "${need_usage4help}" == "true" && "${1}" != "${STACK_COMMAND_NAME}" ]]; then
       usage4help;
       # Continue the script execution
       forceStop="false"
-    # HELP > stack > Command
+    # HELP > $STACK_COMMAND_NAME > Command
     else
       usage;
     fi
