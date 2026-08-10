@@ -21,8 +21,8 @@ PROCESS_SOURCE=("$LIB_NAME")
 # ---------------------------------------------------------------------
 
 helpify_title() {
-  local command_name="$(basename "${0}")"
-  printf "  ${c_cyan}%s${c_blue}%s ${c_blue}%s ${c_green}%s\n\n" "Usage: " "$command_name" "$1" "$2"
+  local STACK_COMMAND_NAME="$(basename "${0}")"
+  printf "  ${c_cyan}%s${c_blue}%s ${c_blue}%s ${c_green}%s\n\n" "Usage: " "$STACK_COMMAND_NAME" "$1" "$2"
 }
 
 helpify_subtitle() {

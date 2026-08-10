@@ -26,8 +26,8 @@ MESSAGE_OPTIONS_WARNING="--warning"
 MESSAGE_OPTIONS_INFO="--info"
 MESSAGE_OPTIONS_INFO_STATUS="--info-status"
 MESSAGE_OPTIONS_SUCCESS="--success"
-MESSAGE_OPTIONS_MAGENTA="--magenta"
-MESSAGE_OPTIONS=("$MESSAGE_OPTIONS_ERROR" "$MESSAGE_OPTIONS_WARNING" "$MESSAGE_OPTIONS_INFO" "$MESSAGE_OPTIONS_SUCCESS" "$MESSAGE_OPTIONS_INFO_STATUS" "$MESSAGE_OPTIONS_MAGENTA")
+MESSAGE_OPTIONS_STACK="--stack"
+MESSAGE_OPTIONS=("$MESSAGE_OPTIONS_ERROR" "$MESSAGE_OPTIONS_WARNING" "$MESSAGE_OPTIONS_INFO" "$MESSAGE_OPTIONS_SUCCESS" "$MESSAGE_OPTIONS_STACK" "$MESSAGE_OPTIONS_INFO_STATUS")
 
 # Errors
 MESSAGE_OPTIONS_NOT_SET="Message is not set"
@@ -50,13 +50,14 @@ prompt() {
       echo -e "  ${c_cyan}${2}${c_default}" ;;        # print info message
     "-il")
       echo -e "  ${c_blue}${2}${c_default}" ;;        # print info low message
-    "-m")
-      echo -e "  ${c_magenta}${2}${c_default}" ;;     # print magenta message
+    "-t")
+      echo -e "  ${c_magenta}${2}${c_default}" ;;     # print title message
   esac
 }
 
 # Funzione per stampare un messaggio
-message() {
+message()
+{
   # Check if message type is valid
   if [[ ! "${MESSAGE_OPTIONS[*]}" =~ $1 ]]; then
     message --error "Message type '${1}' is not valid"; exit 1
@@ -79,8 +80,8 @@ message() {
       prompt "-il" "${2}" ;;
     "${MESSAGE_OPTIONS_SUCCESS}")
       prompt "-s" "${2}" ;;
-    "${MESSAGE_OPTIONS_MAGENTA}")
-      prompt "-m" "${2}" ;;
+    "${MESSAGE_OPTIONS_STACK}")
+      prompt "-t" "${2}" ;;
   esac
 }
 
@@ -89,8 +90,4 @@ logo() {
  / _` |  \ |__) /  ` |  \
  \__> |__/ |  \ \__, |__/'
   echo -e "  ${c_blue}${ascii_art}${c_default}";
-}
-
-versionInfo() {
-  echo -e "  ${c_cyan}Version: ${c_magenta}$(getVersion)${c_default}";
 }
