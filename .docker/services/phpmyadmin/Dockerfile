@@ -1,1 +1,1 @@
-FROM phpmyadmin/phpmyadmin:5-fpm-alpine
+FROM phpmyadmin/phpmyadmin:5
