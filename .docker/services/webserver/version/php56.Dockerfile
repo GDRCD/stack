@@ -88,7 +88,9 @@ RUN apk update && apk add --no-cache \
     nginx \
     shadow
 
-RUN mkdir -p /run/nginx
+RUN mkdir -p /run/nginx /etc/nginx/http.d \
+ && rm -rf /etc/nginx/conf.d \
+ && ln -s /etc/nginx/http.d /etc/nginx/conf.d
 
 # Clean up, try to reduce image size
 RUN rm -rf /var/cache/apk/* \
