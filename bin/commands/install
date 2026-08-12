@@ -52,6 +52,8 @@ usage4help() {
 # Set default values
 target="$HOME/.local/bin"
 force_reinstall="false"
+shell_type="$(basename "$SHELL")"
+rc_file=""
 
 # Create the target directory if it does not exist
 mkdir -p "$target"
@@ -118,19 +120,20 @@ install() {
     fi
   fi
 
-  # Check if the target path is present on the PATH variable, if not add it to the .*rc file
-
-  # if macos, add to .zshrc file
-  if [[ "$(uname)" == "Darwin" ]]; then
-    if [[ ":$PATH:" != *":${target}:"* ]]; then
-      echo "export PATH=\"${target}:\$PATH\"" >>"$HOME/.zshrc"
-      message --info "Added ${target} to PATH in .zshrc file. Please restart your terminal or run 'source ~/.zshrc' to apply the changes."
-    fi
+  # Check if the shell is zsh or bash
+  if [[ "${shell_type}" == "zsh" ]]; then
+    rc_file="$HOME/.zshrc"
+  elif [[ "${shell_type}" == "bash" ]]; then
+    rc_file="$HOME/.bashrc"
   else
-    if [[ ":$PATH:" != *":${target}:"* ]]; then
-      echo "export PATH=\"${target}:\$PATH\"" >>"$HOME/.bashrc"
-      message --info "Added ${target} to PATH in .bashrc file. Please restart your terminal or run 'source ~/.bashrc' to apply the changes."
-    fi
+    message --error "Unsupported shell: ${shell_type}. Please add ${target} to your PATH manually."
+    exit 1
+  fi
+
+  # If the target path is not in the PATH variable, add it to the appropriate rc file
+  if [[ ":$PATH:" != *":${target}:"* ]]; then
+    echo "export PATH=\"${target}:\$PATH\"" >>"$rc_file"
+    message --info "Added ${target} to PATH in ${rc_file}. Please restart your terminal or run 'source ${rc_file}' to apply the changes."
   fi
 
   # Create link to the gdrcd binary
