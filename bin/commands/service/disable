@@ -21,6 +21,10 @@ COMMAND_NAME="${args[1]}"
 usage() {
   helpify_title "${SERVICE_NAME:-${CURRENT_DIR_NAME}} disable" "<service>"
   helpify_subtitle "Disable optional services"; echo;
+
+  helpify_subtitle "SERVICES:"
+  listAllOptionalServices; echo;
+
   helpify_subtitle "OPTIONS:"
   helpify "-h, --help"          "Show this help"
 }

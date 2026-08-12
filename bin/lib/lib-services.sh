@@ -81,6 +81,24 @@ getServiceDescription() {
   echo "No description available"
 }
 
+listAllOptionalServices() {
+  # Get all optional services
+  services=($(getAllOptionalServices))
+
+  # Print each service with its status and description
+  for service in "${services[@]}"; do
+
+    status="disabled"
+    if isServiceEnabled "$service"; then
+      status="enabled"
+    fi
+
+    description=$(getServiceDescription "$service")
+
+    helpify "$service" "$description" "Status: $status"
+  done
+}
+
 # Check if service is enabled
 isServiceEnabled() {
   local service=$1

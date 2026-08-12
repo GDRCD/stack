@@ -64,22 +64,7 @@ finalize_argument_parsing
 list () {
   # list all optional services
   prompt -i "List all optional services...";
-
-  # Get all optional services
-  services=($(getAllOptionalServices))
-
-  # Print each service with its status and description
-  for service in "${services[@]}"; do
-
-    status="disabled"
-    if isServiceEnabled "$service"; then
-      status="enabled"
-    fi
-
-    description=$(getServiceDescription "$service")
-
-    helpify "$service" "$description" "Status: $status"
-  done
+  listAllOptionalServices
 }
 
 # Run command if this file is the command file
