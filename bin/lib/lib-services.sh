@@ -29,7 +29,7 @@ SERVICES=()
 SERVICES=("${CORE_SERVICES[@]}")
 if [[ -f "${STACK_DIR}/services" ]]; then
   # Read comma-separated services from file
-  while IFS=',' read -ra ENABLED; do
+  while IFS=',' read -ra ENABLED || [[ ${#ENABLED[@]} -gt 0 ]]; do
     for service in "${ENABLED[@]}"; do
       # Trim whitespace
       service=$(echo "$service" | xargs)
@@ -50,11 +50,38 @@ SERVICE_DESCRIPTIONS=(
 # Services
 # ---------------------------------------------------------------------
 
+# Check if a value is present in the given list (exact match)
+containsService() {
+  local needle=$1; shift
+
+  for item in "$@"; do
+    if [[ "$item" == "$needle" ]]; then
+      return 0
+    fi
+  done
+
+  return 1
+}
+
+# Persist the currently enabled optional services to the services file
+saveEnabledServices() {
+  local enabled=()
+  for service in "${SERVICES[@]}"; do
+    if ! containsService "$service" "${CORE_SERVICES[@]}"; then
+      enabled+=("$service")
+    fi
+  done
+
+  # Write them back comma-separated
+  local IFS=','
+  echo "${enabled[*]}" > "${STACK_DIR}/services"
+}
+
 # Get only enabled optional services
 getOptionalServices() {
   local services=()
   for service in "${SERVICES[@]}"; do
-    if [[ ! "${CORE_SERVICES[*]}" =~ $service ]]; then
+    if ! containsService "$service" "${CORE_SERVICES[@]}"; then
       services+=("$service")
     fi
   done
@@ -102,7 +129,7 @@ listAllOptionalServices() {
 # Check if service is enabled
 isServiceEnabled() {
   local service=$1
-  [[ "${SERVICES[*]}" =~ $service ]]
+  containsService "$service" "${SERVICES[@]}"
 }
 
 # Enable a service
@@ -110,18 +137,15 @@ enableService() {
   local service=$1
 
   # Validate service exists
-  if [[ ! "${OPTIONAL_SERVICES[*]}" =~ $service ]]; then
+  if ! containsService "$service" "${OPTIONAL_SERVICES[@]}"; then
     message --error "Service '$service' not found"
     return 1
   fi
 
-  # Add to services file if not already enabled
+  # Enable the service if not already enabled
   if ! isServiceEnabled "$service"; then
-    if [[ -f "${STACK_DIR}/services" ]]; then
-      echo -n ",$service" >> "${STACK_DIR}/services"
-    else
-      echo "$service" > "${STACK_DIR}/services"
-    fi
+    SERVICES+=("$service")
+    saveEnabledServices
   fi
 }
 
@@ -130,13 +154,21 @@ disableService() {
   local service=$1
 
   # Validate service exists
-  if [[ ! "${OPTIONAL_SERVICES[*]}" =~ $service ]]; then
+  if ! containsService "$service" "${OPTIONAL_SERVICES[@]}"; then
     message --error "Service '$service' not found"
     return 1
   fi
 
-  # Remove from services file if enabled
+  # Drop only this service
   if isServiceEnabled "$service"; then
-    sed -i "/$service/d" "${STACK_DIR}/services"
+    local remaining=()
+    for item in "${SERVICES[@]}"; do
+      if [[ "$item" != "$service" ]]; then
+        remaining+=("$item")
+      fi
+    done
+
+    SERVICES=("${remaining[@]}")
+    saveEnabledServices
   fi
 }
