@@ -12,8 +12,11 @@ services:
     volumes:
       # Log
       - "${STACK_DIR}/logs/nginx:/var/log/nginx"
+      # Nginx
+      - "${STACK_DIR}/.docker/services/webserver/config/nginx/http.d:/etc/nginx/http.d:ro"
       # PHP
-      - "${STACK_DIR}/.docker/services/webserver/config/conf.d:/usr/local/etc/php/conf.d:ro"
+      - "${STACK_DIR}/.docker/services/webserver/config/php/conf.d:/usr/local/etc/php/conf.d:ro"
+      - "${STACK_DIR}/.docker/services/webserver/config/php/php-fpm.d/www.conf:/usr/local/etc/php-fpm.d/www.conf:ro"
       # Web
       - "${STACK_DIR}/www:/var/www/html"
       # Cache
