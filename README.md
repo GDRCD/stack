@@ -54,7 +54,7 @@ Per proseguire con l'installazione, occorre eseguire il comando di installazione
 sudo ./stack install
 ```
 
-> N.B.: è possibile configurare il percorso in cui installare il comando globale aggiungendo l'opzione `-t` dopo [`bin/commands/install`](bin/commands/install) seguito dal percorso desiderato. Di default, il comando viene installato in [`/usr/local/bin/`](/usr/local/bin/).
+> N.B.: è possibile configurare il percorso in cui installare il comando globale aggiungendo l'opzione `-t` dopo [`bin/commands/install`](bin/commands/install) seguito dal percorso desiderato. Di default, il comando viene installato in `$HOME/.local/bin/`.
 
 Il comando di installazione configura l'ambiente di sviluppo e crea un alias di sistema per il progetto.
 L'alias sarà uguale al nome specificato nella variabile PROJECT del file `.env`.
@@ -233,7 +233,7 @@ Installa lo stack e crea un alias di sistema per il progetto.
 
 Opzioni disponibili:
 
-- `-t, --target <path>`: Specifica il percorso di installazione del comando globale (default: [`/usr/local/bin/`](/usr/local/bin/))
+- `-t, --target <path>`: Specifica il percorso di installazione del comando globale (default: `$HOME/.local/bin/`)
 - `-f, --force`: Forza la reinstallazione del comando globale
 
 `./stack service list`
@@ -406,7 +406,7 @@ Lo stack mette a disposizione una serie di servizi, che sono:
 
 - Web Server (nginx)
 - PHP (php56, php73, php80, php84)
-- MySQL (mysql5.7)
+- MySQL (mysql8.0)
 - PhpMyAdmin (phpmyadmin)
 - Mailhog (mailhog)
 
