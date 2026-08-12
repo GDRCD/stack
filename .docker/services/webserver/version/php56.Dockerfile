@@ -27,8 +27,7 @@ RUN apk add --no-cache \
     icu-dev \
     libwebp-dev \
     oniguruma-dev \
-    curl-dev \
-    libmemcached-dev
+    curl-dev
 
 
 # Other PHP Extensions
@@ -87,7 +86,7 @@ ARG uid
 # Install serve dependencies
 RUN apk update && apk add --no-cache \
     nginx \
-    memcached
+    shadow
 
 RUN mkdir -p /run/nginx
 
@@ -95,8 +94,9 @@ RUN mkdir -p /run/nginx
 RUN rm -rf /var/cache/apk/* \
     && rm -rf /tmp/*
 
-# Copy nginx config
-COPY .docker/services/webserver/config/sites-available/default.nginx /etc/nginx/conf.d/default.conf
+# Align www-data with the host user, so files written by PHP stay editable
+RUN groupmod -o -g "${uid}" www-data \
+ && usermod  -o -u "${uid}" -g "${uid}" www-data
 
 # Set cache directory permissions
 RUN mkdir -p /var/www/html/cache && chown www-data:www-data /var/www/html/cache

@@ -26,7 +26,6 @@ RUN apk add --no-cache \
     libvpx-dev \
     oniguruma-dev \
     curl-dev \
-    libmemcached-dev \
     zlib-dev
 
 # Other PHP Extensions
@@ -84,14 +83,15 @@ ARG uid
 # Install serve dependencies
 RUN apk update && apk add --no-cache \
     nginx \
-    memcached
+    shadow
 
 # Clean up, try to reduce image size
 RUN rm -rf /var/cache/apk/* \
     && rm -rf /tmp/*
 
-# Copy nginx config
-COPY .docker/services/webserver/config/sites-available/default.nginx /etc/nginx/http.d/default.conf
+# Align www-data with the host user, so files written by PHP stay editable
+RUN groupmod -o -g "${uid}" www-data \
+ && usermod  -o -u "${uid}" -g "${uid}" www-data
 
 # Set cache directory permissions
 RUN mkdir -p /var/www/html/cache && chown www-data:www-data /var/www/html/cache
