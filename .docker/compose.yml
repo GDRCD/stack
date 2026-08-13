@@ -19,8 +19,6 @@ services:
       - "${STACK_DIR}/.docker/services/webserver/config/php/php-fpm.d/www.conf:/usr/local/etc/php-fpm.d/www.conf:ro"
       # Web
       - "${STACK_DIR}/www:/var/www/html"
-      # Cache
-      - "www-cache:/var/www/html/cache"
     environment:
       MYSQL_USER: ${MYSQL_USER}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
@@ -67,7 +65,6 @@ services:
 # Volumes
 volumes:
   database-data:
-  www-cache:
 
 # Networks
 networks:
