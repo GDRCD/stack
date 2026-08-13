@@ -12,9 +12,15 @@ Di seguito, gli indirizzi con i riferimenti per l'installazione di questi strume
 - [Docker Desktop (o Docker Toolbox)](https://www.docker.com/products/docker-desktop)
 - [GIT](https://git-scm.com/downloads)
 
+Su **macOS** occorre inoltre installare le GNU coreutils, da cui lo stack prende `greadlink`:
+
+```shell
+brew install coreutils
+```
+
 Occorre avere un minimo di dimestichezza con il terminale per poter utilizzare lo **_stack_**.
 
-> N.B.: Su sistemi Linux e macOS si utilizza la shell Bash, mentre su Windows è necessario utilizzare WSL (Windows Subsystem for Linux), poiché **lo stack non è compatibile con PowerShell**.
+> N.B.: Su sistemi Linux e macOS si può utilizzare qualsiasi shell, ma occorre eseguire lo stack come Bash, mentre su Windows è necessario utilizzare WSL (Windows Subsystem for Linux), poiché **lo stack non è compatibile con PowerShell**.
 
 ## Installazione
 

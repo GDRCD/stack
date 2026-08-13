@@ -1,6 +1,24 @@
 #!/usr/bin/env bash
 
 # ---------------------------------------------------------------------
+# Interpreter
+# ---------------------------------------------------------------------
+
+# Check if the script is being run with bash
+if [ -z "${BASH_VERSION:-}" ]; then
+  echo "Error! This stack must be run with bash." >&2
+  echo "Run it directly ('./stack ...') so the shebang picks the right shell." >&2
+  exit 1
+fi
+
+# Minimum bash version check (3.2, compatible with macOS)
+if [ "${BASH_VERSINFO[0]}" -lt 3 ] ||
+  { [ "${BASH_VERSINFO[0]}" -eq 3 ] && [ "${BASH_VERSINFO[1]}" -lt 2 ]; }; then
+  echo "Error! bash 3.2 or newer is required, found ${BASH_VERSION}." >&2
+  exit 1
+fi
+
+# ---------------------------------------------------------------------
 # Variables
 # ---------------------------------------------------------------------
 
