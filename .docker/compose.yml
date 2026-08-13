@@ -1,8 +1,8 @@
 services:
   webserver:
     build:
-      context: "${STACK_DIR}"
-      dockerfile: "${STACK_DIR}/.docker/services/webserver/version/${PHP_VERSION}.Dockerfile"
+      context: "services/webserver"
+      dockerfile: "version/${PHP_VERSION}.Dockerfile"
       args:
         uid: "${PHP_UID}"
     image: "${PROJECT}_webserver"
@@ -15,7 +15,7 @@ services:
       # Nginx
       - "${STACK_DIR}/.docker/services/webserver/config/nginx/http.d:/etc/nginx/http.d:ro"
       # PHP
-      - "${STACK_DIR}/.docker/services/webserver/config/php/conf.d:/usr/local/etc/php/conf.d:ro"
+      - "${STACK_DIR}/.docker/services/webserver/config/php/conf.d/php.ini:/usr/local/etc/php/conf.d/zz-gdrcd.ini:ro"
       - "${STACK_DIR}/.docker/services/webserver/config/php/php-fpm.d/www.conf:/usr/local/etc/php-fpm.d/www.conf:ro"
       # Web
       - "${STACK_DIR}/www:/var/www/html"
