@@ -8,14 +8,11 @@ importLib "lib/lib-docker.sh"
 
 # Get current file name
 CURRENT_FILE_NAME="$(basename "${BASH_SOURCE[0]}")"
-# Get directory name
-CURRENT_DIR_NAME="$(basename "$(dirname "${BASH_SOURCE[0]}")")"
 
 # Save command name
 args=("$@")
-# Set service name by arguments or by current directory name
-SERVICE_NAME="${args[0]}"
-COMMAND_NAME="${args[1]}"
+COMMAND_NAME="${args[0]}"
+SERVICE_NAMES=()
 
 # ---------------------------------------------------------------------
 # Helpers
@@ -23,16 +20,15 @@ COMMAND_NAME="${args[1]}"
 
 # Function for showing usage of this command
 usage() {
-  helpify_title "${SERVICE_NAME:-${CURRENT_DIR_NAME}} restart" "[OPTIONS...]"
-  helpify_subtitle "Restart ${SERVICE_NAME:-${CURRENT_DIR_NAME}} container"; echo;
+  helpify_title "attach" "[OPTIONS...] <service>"
+  helpify_subtitle "Open a shell inside a container"; echo;
   helpify_subtitle "OPTIONS:"
-  helpify "-h, --help"          "Show this help"
-
+  helpify "-h, --help" "Show this help"
 }
 
 # Function for showing usage of this command for help
 usage4help() {
-  helpify "restart"       "Restart ${SERVICE_NAME:-${CURRENT_DIR_NAME}} container"
+  helpify "attach" "Open a shell inside a container"
 }
 
 # ---------------------------------------------------------------------
@@ -43,17 +39,23 @@ usage4help() {
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
-  # if the argument is the command name, skip it
-  if [[ "$1" == "${COMMAND_NAME}" || "$1" == "${SERVICE_NAME}" ]]; then
-    shift; continue
-  fi
-
-  #
   case "$1" in
-    -h|--help)
-      need_help="true"; shift ;;
-    *)
-      messageUnknownCommand "${SERVICE_NAME:-${CURRENT_DIR_NAME}} ${COMMAND_NAME}" "$1"; exit 1;;
+  "${COMMAND_NAME}")
+    shift
+    ;; # Skip the command name
+  -h | --help)
+    need_help="true"
+    shift
+    ;;
+  *)
+    if isServiceEnabled "$1"; then
+      SERVICE_NAMES+=("$1")
+      shift
+    else
+      messageUnknownCommand "$COMMAND_NAME" "$1"
+      exit 1
+    fi
+    ;;
   esac
 done
 
@@ -62,15 +64,29 @@ finalize_argument_parsing
 
 #---------------------------RUN COMMAND-------------------------------#
 
-restart() {
+attach() {
+  # Only one service can be attached to at a time
+  if [[ ${#SERVICE_NAMES[@]} -ne 1 ]]; then
+    if [[ ${#SERVICE_NAMES[@]} -eq 0 ]]; then
+      prompt -e "Error! '${COMMAND_NAME}' needs a service to attach to."
+    else
+      prompt -e "Error! '${COMMAND_NAME}' accepts a single service, got ${#SERVICE_NAMES[@]}."
+    fi
+    usage
+    exit 1
+  fi
+
+  SERVICE_NAME="${SERVICE_NAMES[0]}"
+
   # Preliminary checks
   isContainerExist "${SERVICE_NAME}"
+  isContainerRunning "${SERVICE_NAME}"
   #
-  prompt -i "Restarting ${SERVICE_NAME} container..."
-  dockerCompose restart "${SERVICE_NAME}"
+  prompt -i "Attaching to ${SERVICE_NAME} container..."
+  dockerCompose exec -it "${SERVICE_NAME}" bash && return 0;
 }
 
 # Run command if this file is the command file
 if [[ "${COMMAND_NAME}" == "${CURRENT_FILE_NAME}" ]]; then
-  restart
+  attach
 fi

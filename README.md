@@ -183,25 +183,32 @@ Di seguito i comandi a disposizione:
 
 ## Dettaglio dei Comandi
 
-`./stack start`
+I comandi generici agiscono su tutto lo stack se invocati senza argomenti, oppure
+solo sui servizi elencati: `./stack restart webserver database`.
 
-Avvia tutti i container dello stack.
+`./stack start [<service>...]`
 
-`./stack stop`
+Avvia tutti i container dello stack, o solo quelli indicati.
 
-Ferma tutti i container dello stack.
+`./stack stop [<service>...]`
 
-`./stack restart`
+Ferma tutti i container dello stack, o solo quelli indicati.
 
-Riavvia tutti i container dello stack.
+`./stack restart [<service>...]`
 
-`./stack build`
+Riavvia tutti i container dello stack, o solo quelli indicati.
 
-Compila tutti i container dello stack.
+`./stack build [<service>...]`
+
+Compila tutti i container dello stack, o solo quelli indicati.
 
 Opzioni disponibili:
 
 - `-f, --force`: Forza la ricompilazione dei container
+
+`./stack attach <service>`
+
+Apre una shell dentro il container del servizio indicato. (Solo uno alla volta!)
 
 `./stack clean`
 
@@ -211,9 +218,9 @@ Opzioni disponibili:
 
 - `-v, --volumes`: Rimuove anche i volumi associati ai container
 
-`./stack logs`
+`./stack logs [<service>...]`
 
-Mostra i log di tutti i container dello stack.
+Mostra i log di tutti i container dello stack, o solo di quelli indicati.
 
 Opzioni disponibili:
 
@@ -248,39 +255,11 @@ Abilita un servizio opzionale.
 
 Disabilita un servizio opzionale.
 
-`./stack database logs`
+### Comandi specifici di un servizio
 
-Mostra i log del container `database`.
+Oltre ai comandi generici visti sopra, alcuni servizi espongono comandi propri.
 
-Opzioni disponibili:
-
-- `-f, --follow`: Segue i log in tempo reale
-
-`./stack database start`
-
-Avvia il container `database`.
-
-`./stack database stop`
-
-Ferma il container `database`.
-
-`./stack database restart`
-
-Riavvia il container `database`.
-
-`./stack database build`
-
-Compila il container `database`.
-
-Opzioni disponibili:
-
-- `-f, --force`: Forza la ricompilazione del container
-
-`./stack database attach`
-
-Accede alla shell del container `database`.
-
-`run database export <database_name> [file]`
+`./stack database export <database_name> [file]`
 
 Esporta un database in un file di dump.
 
@@ -288,7 +267,7 @@ Opzioni disponibili:
 
 - `-c, --compress`: Esporta un file di dump compresso
 
-`run database import <database_name> <file>`
+`./stack database import <database_name> <file>`
 
 Importa un file di dump (.sql, .sql.gz).
 
@@ -296,105 +275,10 @@ Opzioni disponibili:
 
 - `-fd, --force-drop`: Elimina lo schema prima dell'importazione
 
-`run database refresh <database_name>`
+`./stack database refresh <database_name>`
 
 Pulisce tutte le tabelle nel database.
 
-`./stack webserver logs`
-
-Mostra i log del container `webserver`.
-
-Opzioni disponibili:
-
-- `-f, --follow`: Segue i log in tempo reale
-
-`./stack webserver start`
-
-Avvia il container `webserver`.
-
-`./stack webserver stop`
-
-Ferma il container `webserver`.
-
-`./stack webserver restart`
-
-Riavvia il container `webserver`.
-
-`./stack webserver build`
-
-Compila il container `webserver`.
-
-Opzioni disponibili:
-
-- `-f, --force`: Forza la ricompilazione del container
-
-`./stack webserver attach`
-
-Accede alla shell del container `webserver`.
-
-`./stack phpmyadmin logs`
-
-Mostra i log del container `phpmyadmin`.
-
-Opzioni disponibili:
-
-- `-f, --follow`: Segue i log in tempo reale
-
-`./stack phpmyadmin start`
-
-Avvia il container `phpmyadmin`.
-
-`./stack phpmyadmin stop`
-
-Ferma il container `phpmyadmin`.
-
-`./stack phpmyadmin restart`
-
-Riavvia il container `phpmyadmin`.
-
-`./stack phpmyadmin build`
-
-Compila il container `phpmyadmin`.
-
-Opzioni disponibili:
-
-- `-f, --force`: Forza la ricompilazione del container
-
-`./stack phpmyadmin attach`
-
-Accede alla shell del container `phpmyadmin`.
-
-`./stack mailhog logs`
-
-Mostra i log del container `mailhog`.
-
-Opzioni disponibili:
-
-- `-f, --follow`: Segue i log in tempo reale
-
-`./stack mailhog start`
-
-Avvia il container `mailhog`.
-
-`./stack mailhog stop`
-
-Ferma il container `mailhog`.
-
-`./stack mailhog restart`
-
-Riavvia il container `mailhog`.
-
-`./stack mailhog build`
-
-Compila il container `mailhog`.
-
-Opzioni disponibili:
-
-- `-f, --force`: Forza la ricompilazione del container
-
-`./stack mailhog attach`
-
-Accede alla shell del container `mailhog`.
 
 > N.B.: Se utilizzi l'installazione, non è necessario eseguire ogni volta il comando da eseguibile, ma direttamente dalla shortcut globale.
 
