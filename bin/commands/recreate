@@ -58,9 +58,6 @@ finalize_argument_parsing
 #---------------------------RUN COMMAND-------------------------------#
 
 start() {
-  # Preliminary checks
-  isContainerExist
-  #
   prompt -i "Recreating all stack stuff..."
   dockerCompose up -d --force-recreate
 }
