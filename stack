@@ -71,21 +71,6 @@ usage () {
 
   #
   usageCommands
-
-  #
-  usageSubDirsCommands
-}
-
-usageService () {
-  # show usage for service commands
-  need_help="true";
-  need_usage4help="true"
-
-  #
-  usageSubDirCommands "${1}"
-
-  # force exit
-  exit 0;
 }
 
 # -----------------------------------------------------------------------------
@@ -117,23 +102,6 @@ while [[ $# -gt 0 ]]; do
         # shellcheck source=bin
         source "${COMMANDS_DIR}/$1";
         exit 0;
-      # otherwise, check if is a valid sub-command
-      elif isSubCommand "$1"; then
-        # check if there is a second argument
-        if [[ $# -gt 1 ]]; then
-          # if is a valid command, run it
-          if isCommand --abs-path "${COMMANDS_DIR}/$1/$2"; then
-            # shellcheck source=bin
-            source "${COMMANDS_DIR}/$1/$2";
-            exit 0;
-          # otherwise, if there is no other entries, show error
-          else
-            prompt -e "Error! Unrecognized $1 command: ${2}"; has_any_error="true";
-            break;
-          fi
-        else
-          usageService "$1" || exit 1
-        fi
       # otherwise, if there is no other entries, show error
       else
         prompt -e "Error! Unrecognized stack command: ${*}"; has_any_error="true";

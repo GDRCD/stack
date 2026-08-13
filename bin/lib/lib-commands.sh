@@ -36,32 +36,6 @@ isCommand() {
   esac
 }
 
-# check if a sub-command is a core handler rather than a service
-isCoreHandler() {
-  containsValue "$1" "${CORE_HANDLER[@]}"
-}
-
-# check if a sub-command is a service
-isSubCommand() {
-  # check if is a valid service or a handler
-  if ! containsValue "$1" "${SERVICES[@]}" && ! isCoreHandler "$1"; then
-    return 1;
-  fi
-
-  # check if directory exists and contains at least one command
-  hasCommands "${COMMANDS_DIR}/$1"
-}
-
-# check if a directory contains at least one command
-hasCommands() {
-  for file in "${1}/"*; do
-    if [[ -f "${file}" ]] && command -v "${file}" >/dev/null 2>&1; then
-      return 0
-    fi
-  done
-  return 1
-}
-
 # ---------------------------------------------------------------------
 # Usage
 # ---------------------------------------------------------------------
@@ -90,45 +64,6 @@ usageCommands () {
     # execute command to get usage
     # shellcheck disable=SC1090
     source "${command}"
-  done
-}
-
-# Show commands for sub-directories
-usageSubDirsCommands () {
-  # scan bin sub-directories for commands
-  for subCommandDir in "${COMMANDS_DIR}"/*; do
-    [[ -d "${subCommandDir}" ]] || continue
-    usageSubDirCommands "$(basename "${subCommandDir}")" || continue
-  done
-}
-
-# Show commands for a sub-directory
-usageSubDirCommands () {
-  local subCommand="${1}"
-  local subDirCommand="${COMMANDS_DIR}/${subCommand}"
-  local command
-
-  # check if is a valid service or a handler
-  if ! containsValue "${subCommand}" "${SERVICES[@]}" && ! isCoreHandler "${subCommand}"; then
-    return 1;
-  fi
-
-  # check if directory contains at least one command
-  if ! hasCommands "${subDirCommand}"; then
-    return 1;
-  fi
-
-  # show title
-  echo; helpify_subcommand_title "${STACK_COMMAND_NAME} ${subCommand}" "" "[OPTIONS...] COMMAND [OPTIONS...]";
-
-  # scan bin sub-directories for commands
-  for command in "${subDirCommand}"/*; do
-    # skip anything that is not a command
-    isCommand --abs-path "${command}" || continue
-
-    # execute command to get usage
-    # shellcheck disable=SC1090
-    source "${command}" "${subCommand}"
   done
 }
 
