@@ -51,6 +51,7 @@ Di seguito le versioni attualmente supportate, con i relativi riferimenti:
 - PHP 7.3 (php73)
 - PHP 8.0 (php80)
 - PHP 8.4 (php84)
+- PHP 8.5 (php85)
 
 > N.B.: Puoi cambiare la versione PHP utilizzata in qualsiasi momento, cambiando la variabile nel file [`.env`](.env) e ricostruendo lo stack.
 
