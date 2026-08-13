@@ -51,7 +51,7 @@ SERVICE_DESCRIPTIONS=(
 # ---------------------------------------------------------------------
 
 # Check if a value is present in the given list (exact match)
-containsService() {
+containsValue() {
   local needle=$1; shift
 
   for item in "$@"; do
@@ -67,7 +67,7 @@ containsService() {
 saveEnabledServices() {
   local enabled=()
   for service in "${SERVICES[@]}"; do
-    if ! containsService "$service" "${CORE_SERVICES[@]}"; then
+    if ! containsValue "$service" "${CORE_SERVICES[@]}"; then
       enabled+=("$service")
     fi
   done
@@ -81,7 +81,7 @@ saveEnabledServices() {
 getOptionalServices() {
   local services=()
   for service in "${SERVICES[@]}"; do
-    if ! containsService "$service" "${CORE_SERVICES[@]}"; then
+    if ! containsValue "$service" "${CORE_SERVICES[@]}"; then
       services+=("$service")
     fi
   done
@@ -129,7 +129,7 @@ listAllOptionalServices() {
 # Check if service is enabled
 isServiceEnabled() {
   local service=$1
-  containsService "$service" "${SERVICES[@]}"
+  containsValue "$service" "${SERVICES[@]}"
 }
 
 # Enable a service
@@ -137,7 +137,7 @@ enableService() {
   local service=$1
 
   # Validate service exists
-  if ! containsService "$service" "${OPTIONAL_SERVICES[@]}"; then
+  if ! containsValue "$service" "${OPTIONAL_SERVICES[@]}"; then
     message --error "Service '$service' not found"
     return 1
   fi
@@ -154,7 +154,7 @@ disableService() {
   local service=$1
 
   # Validate service exists
-  if ! containsService "$service" "${OPTIONAL_SERVICES[@]}"; then
+  if ! containsValue "$service" "${OPTIONAL_SERVICES[@]}"; then
     message --error "Service '$service' not found"
     return 1
   fi

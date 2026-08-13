@@ -36,25 +36,20 @@ isCommand() {
   esac
 }
 
-# check if is a service command
+# check if a sub-command is a core handler rather than a service
+isCoreHandler() {
+  containsValue "$1" "${CORE_HANDLER[@]}"
+}
+
+# check if a sub-command is a service
 isSubCommand() {
-  # check if is a valid service or handler
-    # check if is a valid service or a handler
-  if [[ ! "${SERVICES[*]}" =~ $1 ]] && [[ ! "${CORE_HANDLER[*]}" =~ $1 ]]; then
+  # check if is a valid service or a handler
+  if ! containsValue "$1" "${SERVICES[@]}" && ! isCoreHandler "$1"; then
     return 1;
   fi
 
-  # check if exist directory
-  if [[ ! -d "${COMMANDS_DIR}/$1" ]]; then
-    return 1
-  fi
-
-  # check if directory contains at least one command
-  if ! hasCommands "${COMMANDS_DIR}/$1"; then
-    return 1
-  fi
-
-  return 0
+  # check if directory exists and contains at least one command
+  hasCommands "${COMMANDS_DIR}/$1"
 }
 
 # check if a directory contains at least one command
@@ -102,28 +97,23 @@ usageCommands () {
 usageSubDirsCommands () {
   # scan bin sub-directories for commands
   for subCommandDir in "${COMMANDS_DIR}"/*; do
-    subCommand="$(basename "${subCommandDir}")"
-    usageSubDirCommands "${subCommand}" || continue
+    [[ -d "${subCommandDir}" ]] || continue
+    usageSubDirCommands "$(basename "${subCommandDir}")" || continue
   done
 }
 
 # Show commands for a sub-directory
 usageSubDirCommands () {
-  # get service name and directory
   local subCommand="${1}"
   local subDirCommand="${COMMANDS_DIR}/${subCommand}"
+  local command
 
   # check if is a valid service or a handler
-  if [[ ! "${SERVICES[*]}" =~ $subCommand ]] && [[ ! "${CORE_HANDLER[*]}" =~ $subCommand ]]; then
+  if ! containsValue "${subCommand}" "${SERVICES[@]}" && ! isCoreHandler "${subCommand}"; then
     return 1;
   fi
 
-  # skip non-directories
-  if [[ ! -d "${subDirCommand}" ]]; then
-    return 1;
-  fi
-
-  # check if directory containains at least one command
+  # check if directory contains at least one command
   if ! hasCommands "${subDirCommand}"; then
     return 1;
   fi
@@ -133,24 +123,12 @@ usageSubDirCommands () {
 
   # scan bin sub-directories for commands
   for command in "${subDirCommand}"/*; do
-    # skip non-executable files
-    if [[ ! -x "${command}" ]]; then
-      return 1;
-    fi
-
-    # skip directories
-    if [[ -d "${command}" ]]; then
-      return 1;
-    fi
-
-    # check if is a command
-    if ! isCommand --abs-path "${command}"; then
-      return 1;
-    fi
+    # skip anything that is not a command
+    isCommand --abs-path "${command}" || continue
 
     # execute command to get usage
     # shellcheck disable=SC1090
-    source "${command}"
+    source "${command}" "${subCommand}"
   done
 }
 
