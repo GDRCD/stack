@@ -13,6 +13,15 @@ CURRENT_FILE_NAME="$(basename "${BASH_SOURCE[0]}")"
 args=("$@")
 COMMAND_NAME="${args[0]}"
 
+# If the script is run as root, install in /usr/local/bin, otherwise in $HOME/.local/bin
+if [[ "$(id -u)" -eq 0 ]]; then
+  is_root="true"
+  default_target="/usr/local/bin"
+else
+  is_root="false"
+  default_target="${HOME}/.local/bin"
+fi
+
 # ---------------------------------------------------------------------
 # Messages
 # ---------------------------------------------------------------------
@@ -35,7 +44,7 @@ usage() {
   echo
   helpify_subtitle "OPTIONS:"
   helpify "-h, --help" "Show this help"
-  helpify "-t, --target" "Set the global command installation path" "[default: $HOME/.local/bin]"
+  helpify "-t, --target" "Set the global command installation path" "[default: ${default_target}]"
   helpify "-f, --force" "Force reinstallation of global command"
 }
 
@@ -50,13 +59,10 @@ usage4help() {
 #---------------------------PARSE ARGUMENTS-------------------------------#
 
 # Set default values
-target="$HOME/.local/bin"
+target=""
 force_reinstall="false"
 shell_type="$(basename "$SHELL")"
 rc_file=""
-
-# Create the target directory if it does not exist
-mkdir -p "$target"
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -90,10 +96,26 @@ done
 # Execute post argument parsing checks
 finalize_argument_parsing
 
+# Fall back to the default target when option --target was not given
+if [[ -z "${target}" ]]; then
+  target="${default_target}"
+  target_is_default="true"
+else
+  target_is_default="false"
+fi
+
 #---------------------------RUN COMMAND-------------------------------#
 
 install() {
+  # Check if the target path is the default one and if the script is run as root
+  if [[ "${is_root}" == "true" && "${target_is_default}" == "true" ]]; then
+    message --info "Running as root: installing system wide in ${target} instead of a user directory."
+  fi
+
   message --stack "${MESSAGE_INSTALL_START} in ${target}"
+
+  # Ensure the target directory exists, create it if it doesn't
+  mkdir -p "${target}" 2>/dev/null || true
 
   # Check if the target path is a directory
   if [[ ! -d "$target" ]]; then
@@ -120,20 +142,24 @@ install() {
     fi
   fi
 
-  # Check if the shell is zsh or bash
-  if [[ "${shell_type}" == "zsh" ]]; then
-    rc_file="$HOME/.zshrc"
-  elif [[ "${shell_type}" == "bash" ]]; then
-    rc_file="$HOME/.bashrc"
-  else
-    message --error "Unsupported shell: ${shell_type}. Please add ${target} to your PATH manually."
-    exit 1
-  fi
-
-  # If the target path is not in the PATH variable, add it to the appropriate rc file
+  # Determine the shell type and the appropriate rc file to modify
   if [[ ":$PATH:" != *":${target}:"* ]]; then
-    echo "export PATH=\"${target}:\$PATH\"" >>"$rc_file"
-    message --info "Added ${target} to PATH in ${rc_file}. Please restart your terminal or run 'source ${rc_file}' to apply the changes."
+    if [[ "${is_root}" == "true" ]]; then
+      # No need to modify the rc of root
+      message --info "${target} is not in your PATH, please add it manually."
+    elif [[ "${shell_type}" == "zsh" ]]; then
+      rc_file="$HOME/.zshrc"
+    elif [[ "${shell_type}" == "bash" ]]; then
+      rc_file="$HOME/.bashrc"
+    else
+      message --error "Unsupported shell: ${shell_type}. Please add ${target} to your PATH manually."
+      exit 1
+    fi
+
+    if [[ -n "${rc_file}" ]]; then
+      echo "export PATH=\"${target}:\$PATH\"" >>"$rc_file"
+      message --info "Added ${target} to PATH in ${rc_file}. Please restart your terminal or run 'source ${rc_file}' to apply the changes."
+    fi
   fi
 
   # Create link to the gdrcd binary

@@ -48,13 +48,16 @@ Di seguito le versioni attualmente supportate, con i relativi riferimenti:
 
 > N.B.: Puoi cambiare la versione PHP utilizzata in qualsiasi momento, cambiando la variabile nel file [`.env`](.env) e ricostruendo lo stack.
 
-Per proseguire con l'installazione, occorre eseguire il comando di installazione con i permessi di amministratore:
+Per proseguire con l'installazione, esegui il comando di installazione. Puoi farlo in due modi, a seconda che tu voglia il comando disponibile solo per il tuo utente o per tutti:
 
 ```shell
-sudo ./stack install
+./stack install       # solo per il tuo utente, in $HOME/.local/bin
+sudo ./stack install  # per tutti gli utenti, in /usr/local/bin
 ```
 
-> N.B.: è possibile configurare il percorso in cui installare il comando globale aggiungendo l'opzione `-t` dopo [`bin/commands/install`](bin/commands/install) seguito dal percorso desiderato. Di default, il comando viene installato in `$HOME/.local/bin/`.
+Nel primo caso, se la cartella non è già nel tuo `PATH`, viene aggiunta automaticamente al tuo `.bashrc` o `.zshrc`. Nel secondo caso non viene toccato alcun file di configurazione, perché `/usr/local/bin` è già nel `PATH` di sistema.
+
+> N.B.: è possibile forzare il percorso di installazione con l'opzione `-t`, seguita dal percorso desiderato: `./stack install -t /percorso/scelto`.
 
 Il comando di installazione configura l'ambiente di sviluppo e crea un alias di sistema per il progetto.
 L'alias sarà uguale al nome specificato nella variabile PROJECT del file `.env`.
@@ -240,7 +243,7 @@ Installa lo stack e crea un alias di sistema per il progetto.
 
 Opzioni disponibili:
 
-- `-t, --target <path>`: Specifica il percorso di installazione del comando globale (default: `$HOME/.local/bin/`)
+- `-t, --target <path>`: Specifica il percorso di installazione del comando globale (default: `$HOME/.local/bin/`, oppure `/usr/local/bin/` se eseguito come root)
 - `-f, --force`: Forza la reinstallazione del comando globale
 
 `./stack service list`
