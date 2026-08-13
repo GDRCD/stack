@@ -22,6 +22,9 @@ services:
     environment:
       MYSQL_USER: ${MYSQL_USER}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    depends_on:
+      database:
+        condition: service_healthy
 
   database:
     build:
@@ -38,6 +41,12 @@ services:
       MYSQL_DATABASE: ${MYSQL_DATABASE}
       MYSQL_USER: ${MYSQL_USER}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root -p\"$$MYSQL_ROOT_PASSWORD\" --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
 
   phpmyadmin:
     build:
@@ -50,7 +59,8 @@ services:
       - PMA_HOST=database
       - UPLOAD_LIMIT=64M
     depends_on:
-      - database
+      database:
+        condition: service_healthy
     profiles: ["phpmyadmin"]
 
   mailhog:
