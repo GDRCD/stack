@@ -8,16 +8,13 @@ importLib "lib/lib-docker.sh"
 
 # Get current file name
 CURRENT_FILE_NAME="$(basename "${BASH_SOURCE[0]}")"
-# Get directory name
-CURRENT_DIR_NAME="$(basename "$(dirname "${BASH_SOURCE[0]}")")"
 
 # Save command name
 args=("$@")
-# Set service name by arguments or by current directory name
-SERVICE_NAME="${args[0]}"
-COMMAND_NAME="${args[1]}"
+COMMAND_NAME="${args[0]}"
 
 # Commands variables
+SERVICE_NAME=""
 DATABASE_NAME=""
 
 # ---------------------------------------------------------------------
@@ -26,7 +23,7 @@ DATABASE_NAME=""
 
 # Function for showing usage of this command
 usage() {
-  helpify_title "${SERVICE_NAME:-${CURRENT_DIR_NAME}} refresh" "[OPTIONS...] DATABASE_NAME"
+  helpify_title "refresh" "[OPTIONS...] database DATABASE_NAME"
   helpify_subtitle "Clean all tables in the database"
   helpify_subtitle "OPTIONS:"
   helpify "-h, --help"          "Show this help"
@@ -46,7 +43,7 @@ usage4help() {
 # Parse arguments
 while [[ $# -gt 0 ]]; do
   # if the argument is the command name, skip it
-  if [[ "$1" == "${COMMAND_NAME}" || "$1" == "${SERVICE_NAME}" ]]; then
+  if [[ "$1" == "${COMMAND_NAME}" ]]; then
     shift; continue
   fi
 
@@ -56,12 +53,15 @@ while [[ $# -gt 0 ]]; do
       need_help="true"; shift;
       ;;
     *)
-    	# First argument is the database name
-    	if [[ -z "${DATABASE_NAME}" ]]; then
+    	# First argument is the service this command applies to
+    	if [[ -z "${SERVICE_NAME}" ]]; then
+    		SERVICE_NAME="$1"; shift;
+    	# Second argument is the database name
+    	elif [[ -z "${DATABASE_NAME}" ]]; then
     		DATABASE_NAME="$1"; shift;
       # Other arguments are not allowed
       else
-        messageUnknownCommand "${SERVICE_NAME:-${CURRENT_DIR_NAME}} ${COMMAND_NAME}" "$1"; exit 1;
+        messageUnknownCommand "${COMMAND_NAME}" "$1"; exit 1;
       fi
       ;;
   esac
@@ -73,6 +73,13 @@ finalize_argument_parsing
 #---------------------------RUN COMMAND-------------------------------#
 
 refresh() {
+  # Only the database service can be refreshed
+  if [[ "${SERVICE_NAME}" != "database" ]]; then
+    prompt -e "Error! '${COMMAND_NAME}' only works with the 'database' service."
+    usage
+    exit 1
+  fi
+
   # Preliminary checks
   isContainerExist "${SERVICE_NAME}"
   isContainerRunning "${SERVICE_NAME}"

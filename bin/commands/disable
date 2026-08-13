@@ -4,14 +4,10 @@ importLib "lib/lib-docker.sh"
 
 # Get current file name
 CURRENT_FILE_NAME="$(basename "${BASH_SOURCE[0]}")"
-# Get directory name
-CURRENT_DIR_NAME="$(basename "$(dirname "${BASH_SOURCE[0]}")")"
 
 # Save command name
 args=("$@")
-# Set service name by arguments or by current directory name
-SERVICE_NAME="${args[0]}"
-COMMAND_NAME="${args[1]}"
+COMMAND_NAME="${args[0]}"
 
 # ---------------------------------------------------------------------
 # Helpers
@@ -19,19 +15,19 @@ COMMAND_NAME="${args[1]}"
 
 # Function for showing usage of this command
 usage() {
-  helpify_title "${SERVICE_NAME:-${CURRENT_DIR_NAME}} enable" "<service>"
-  helpify_subtitle "Enable optional services"; echo;
+  helpify_title "disable" "<service>"
+  helpify_subtitle "Disable optional services"; echo;
 
   helpify_subtitle "SERVICES:"
   listAllOptionalServices; echo;
 
   helpify_subtitle "OPTIONS:"
-  helpify "-h, --help"          "Show this help";
+  helpify "-h, --help"          "Show this help"
 }
 
 # Function for showing usage of this command for help
 usage4help() {
-  helpify "enable"       "Enable optional services"
+  helpify "disable"       "Disable optional services"
 }
 
 # ---------------------------------------------------------------------
@@ -44,7 +40,7 @@ service_name=""
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
-  if [[ "$1" == "${COMMAND_NAME}" || "$1" == "${SERVICE_NAME}" ]]; then
+  if [[ "$1" == "${COMMAND_NAME}" ]]; then
     shift; continue
   fi
 
@@ -65,15 +61,21 @@ finalize_argument_parsing
 
 # Validate required arguments
 if [[ -z "$service_name" ]] && [[ "$need_help" != "true" ]]; then
+  message --error "Missing service name"
   usage
   exit 1
 fi
 
 #---------------------------RUN COMMAND-------------------------------#
 
-enable () {
-  enableService "$service_name"
-  message --success "Service $service_name enabled"
+disable () {
+  # Handle container existence
+  dockerCompose stop "$service_name"
+  dockerCompose rm -f "$service_name"
+  # Disable service
+  disableService "$service_name"
+
+  message --success "Service $service_name disabled"
 
   # Restart containers to apply changes
   dockerCompose up -d
@@ -81,5 +83,5 @@ enable () {
 
 # Run command if this file is the command file
 if [[ "${COMMAND_NAME}" == "${CURRENT_FILE_NAME}" ]]; then
-  enable
+  disable
 fi

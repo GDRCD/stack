@@ -8,15 +8,13 @@ importLib "lib/lib-docker.sh"
 
 # Get current file name
 CURRENT_FILE_NAME="$(basename "${BASH_SOURCE[0]}")"
-# Get directory name
-CURRENT_DIR_NAME="$(basename "$(dirname "${BASH_SOURCE[0]}")")"
 
 # Save command name
 args=("$@")
-# Set service name by arguments or by current directory name
-SERVICE_NAME="${args[0]}"
-COMMAND_NAME="${args[1]}"
+COMMAND_NAME="${args[0]}"
 
+# Commands variables
+SERVICE_NAME=""
 DATABASE_NAME=""
 FILE=""
 
@@ -29,7 +27,7 @@ need_fresh_import="false"
 
 # Function for showing usage of this command
 usage() {
-  helpify_title "${SERVICE_NAME:-${CURRENT_DIR_NAME}} import" "[OPTIONS...] DATABASE_NAME FILE"
+  helpify_title "import" "[OPTIONS...] database DATABASE_NAME FILE"
   helpify_subtitle "Import a dump file (.sql, .sql.gz)"; echo;
   helpify_subtitle "OPTIONS:"
   helpify "-h, --help"          "Show this help"
@@ -50,7 +48,7 @@ usage4help() {
 # Parse arguments
 while [[ $# -gt 0 ]]; do
   # if the argument is the command name, skip it
-  if [[ "$1" == "${COMMAND_NAME}" || "$1" == "${SERVICE_NAME}" ]]; then
+  if [[ "$1" == "${COMMAND_NAME}" ]]; then
     shift; continue
   fi
 
@@ -63,15 +61,18 @@ while [[ $# -gt 0 ]]; do
       need_fresh_import="true"; shift;
       ;;
     *)
-    	# First argument is the database name
-    	if [[ -z "${DATABASE_NAME}" ]]; then
+    	# First argument is the service this command applies to
+    	if [[ -z "${SERVICE_NAME}" ]]; then
+    		SERVICE_NAME="$1"; shift;
+    	# Second argument is the database name
+    	elif [[ -z "${DATABASE_NAME}" ]]; then
     		DATABASE_NAME="$1"; shift;
-      # Second argument is the file
+      # Third argument is the file
       elif [[ -z "${FILE}" ]]; then
         FILE="$1"; shift;
       # Other arguments are not allowed
       else
-        messageUnknownCommand "${SERVICE_NAME:-${CURRENT_DIR_NAME}} ${COMMAND_NAME}" "$1"; exit 1;
+        messageUnknownCommand "${COMMAND_NAME}" "$1"; exit 1;
       fi
       ;;
   esac
@@ -83,6 +84,13 @@ finalize_argument_parsing
 #---------------------------RUN COMMAND-------------------------------#
 
 import() {
+  # Only the database service can be imported into
+  if [[ "${SERVICE_NAME}" != "database" ]]; then
+    prompt -e "Error! '${COMMAND_NAME}' only works with the 'database' service."
+    usage
+    exit 1
+  fi
+
   # Preliminary checks
   isContainerExist "${SERVICE_NAME}"
   isContainerRunning "${SERVICE_NAME}"
@@ -133,11 +141,11 @@ import() {
   # Drop schema if needed
   if [[ "${need_fresh_import}" == "true" ]]; then
     prompt -i "Dropping schema..."
-    docker exec -i "${PROJECT}"_database mysql -uroot -p"${MARIADB_ROOT_PASSWORD}" -e "DROP DATABASE IF EXISTS ${DATABASE_NAME}; CREATE DATABASE ${DATABASE_NAME};" || return 1
+    docker exec -i "${PROJECT}"_database mysql -uroot -p"${MYSQL_ROOT_PASSWORD}" -e "DROP DATABASE IF EXISTS ${DATABASE_NAME}; CREATE DATABASE ${DATABASE_NAME};" || return 1
   fi
   # Import dump file
   prompt -i "Importing dump file to ${DATABASE_NAME} ..."
-  docker exec -i "${PROJECT}"_database mysql -uroot -p"${MARIADB_ROOT_PASSWORD}" "${DATABASE_NAME}" < "${FILE}" || return 1
+  docker exec -i "${PROJECT}"_database mysql -uroot -p"${MYSQL_ROOT_PASSWORD}" "${DATABASE_NAME}" < "${FILE}" || return 1
 }
 
 # Run command if this file is the command file

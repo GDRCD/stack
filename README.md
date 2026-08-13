@@ -252,23 +252,19 @@ Opzioni disponibili:
 - `-t, --target <path>`: Specifica il percorso di installazione del comando globale (default: `$HOME/.local/bin/`, oppure `/usr/local/bin/` se eseguito come root)
 - `-f, --force`: Forza la reinstallazione del comando globale
 
-`./stack service list`
+`./stack services`
 
-Elenca tutti i servizi opzionali disponibili.
+Elenca tutti i servizi opzionali disponibili, con il relativo stato.
 
-`./stack service enable <service>`
+`./stack enable <service>`
 
 Abilita un servizio opzionale.
 
-`./stack service disable <service>`
+`./stack disable <service>`
 
 Disabilita un servizio opzionale.
 
-### Comandi specifici di un servizio
-
-Oltre ai comandi generici visti sopra, alcuni servizi espongono comandi propri.
-
-`./stack database export <database_name> [file]`
+`./stack export database <database_name> [file]`
 
 Esporta un database in un file di dump.
 
@@ -276,7 +272,7 @@ Opzioni disponibili:
 
 - `-c, --compress`: Esporta un file di dump compresso
 
-`./stack database import <database_name> <file>`
+`./stack import database <database_name> <file>`
 
 Importa un file di dump (.sql, .sql.gz).
 
@@ -284,7 +280,7 @@ Opzioni disponibili:
 
 - `-fd, --force-drop`: Elimina lo schema prima dell'importazione
 
-`./stack database refresh <database_name>`
+`./stack refresh database <database_name>`
 
 Pulisce tutte le tabelle nel database.
 
