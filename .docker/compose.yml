@@ -5,7 +5,7 @@ services:
       dockerfile: "version/${PHP_VERSION}.Dockerfile"
       args:
         uid: "${PHP_UID}"
-    image: "${PROJECT}_webserver"
+    image: "${PROJECT}_webserver:${PHP_VERSION}"
     container_name: "${PROJECT}_webserver"
     ports:
       - "${SERVICE_PORT}:80"
