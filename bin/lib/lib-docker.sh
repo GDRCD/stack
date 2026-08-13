@@ -149,7 +149,7 @@ dockerCompose() {
 
   # Build profiles array based on enabled services
   profiles=()
-  for service in "phpmyadmin" "mailhog"; do
+  for service in "${OPTIONAL_SERVICES[@]}"; do
     if isServiceEnabled "$service"; then
       profiles+=("--profile" "$service")
     fi
