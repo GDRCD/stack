@@ -52,7 +52,7 @@ while [[ $# -gt 0 ]]; do
     shift
     ;;
   *)
-    if isServiceCommand $1; then
+    if isServiceEnabled "$1"; then
       SERVICE_NAMES+=("$1")
       shift
     else
