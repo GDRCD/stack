@@ -1,77 +1,32 @@
-    # Create image based on the official PHP-FMP image
+# -------------------------------------------------------
+# BASE STAGE
+# -------------------------------------------------------
+
+# Create image based on the official PHP-FPM image
 FROM php:5.6-fpm-alpine AS base-stage
 
-# Arguments defined in docker-compose.yml
+# Arguments defined in compose.yml
 ARG uid
 
-# Update the base libraries
-RUN apk update && apk upgrade
-
-# Install useful tools and install important libaries
+# Install useful tools and important libraries
 RUN apk add --no-cache \
     git nano wget dialog bash \
     build-base \
     zip openssl curl \
-    libmcrypt libmcrypt-dev\
-    libvpx \
-    gettext gettext-dev \
-    freetype freetype-dev \
-    libjpeg-turbo libjpeg-turbo-dev \
-    libpng libpng-dev \
-    libxpm libxpm-dev\
-    libvpx-dev \
-    sqlite-dev \
+    libmcrypt libmcrypt-dev \
     mariadb-client \
     zlib-dev \
     libzip-dev \
-    icu-dev \
-    libwebp-dev \
     oniguruma-dev \
     curl-dev
 
-
 # Other PHP Extensions
-RUN echo "Installing PHP extensions" && \
-    docker-php-ext-install pdo_mysql && \
-    docker-php-ext-install pdo_sqlite && \
-    docker-php-ext-install mysqli && \
-    docker-php-ext-install curl && \
-    docker-php-ext-install tokenizer && \
-    docker-php-ext-install json && \
-    docker-php-ext-install zip && \
-    docker-php-ext-install mbstring && \
-    docker-php-ext-install gettext && \
-    docker-php-ext-install mcrypt  && \
-    docker-php-ext-install opcache && \
-    docker-php-ext-configure gd --with-freetype-dir=/usr/include/ --with-jpeg-dir=/usr/include/ --with-xpm-dir=/usr/include/ --with-vpx-dir=/usr/include/ && \
-    docker-php-ext-install gd
-
-# Other PHP Extensions
-RUN echo "Enabling PHP extensions" && \
-    docker-php-ext-enable pdo_mysql && \
-    docker-php-ext-enable pdo_sqlite && \
-    docker-php-ext-enable mysqli && \
-    docker-php-ext-enable zip
-
-# Install intl extension
-RUN docker-php-ext-configure intl \
-    && docker-php-ext-install intl
+RUN docker-php-ext-install -j"$(nproc)" \
+        mysqli curl zip mbstring mcrypt opcache
 
 # Install sendmailer for Mailhog
 RUN  curl --location --output /usr/local/bin/mhsendmail https://github.com/mailhog/mhsendmail/releases/download/v0.2.0/mhsendmail_linux_amd64  \
      && chmod +x /usr/local/bin/mhsendmail
-
-# Clean up, try to reduce image size
-RUN apk del \
-    libmcrypt \
-    libpng \
-    libjpeg-turbo \
-    freetype \
-    libxpm \
-    libvpx \
-    build-base \
- && rm -rf /var/cache/apk/* \
- && rm -rf /tmp/*
 
 # -------------------------------------------------------
 # SERVE STAGE
@@ -84,17 +39,13 @@ FROM base-stage AS serve-stage
 ARG uid
 
 # Install serve dependencies
-RUN apk update && apk add --no-cache \
+RUN apk add --no-cache \
     nginx \
     shadow
 
 RUN mkdir -p /run/nginx /etc/nginx/http.d \
  && rm -rf /etc/nginx/conf.d \
  && ln -s /etc/nginx/http.d /etc/nginx/conf.d
-
-# Clean up, try to reduce image size
-RUN rm -rf /var/cache/apk/* \
-    && rm -rf /tmp/*
 
 # Align www-data with the host user, so files written by PHP stay editable
 RUN groupmod -o -g "${uid}" www-data \
@@ -104,7 +55,7 @@ RUN groupmod -o -g "${uid}" www-data \
 RUN mkdir -p /var/www/html/cache && chown www-data:www-data /var/www/html/cache
 
 # Copy entrypoint
-COPY .docker/services/webserver/entrypoint.sh /usr/local/bin/
+COPY entrypoint.sh /usr/local/bin/
 RUN chmod +x /usr/local/bin/entrypoint.sh
 RUN ln -s /usr/local/bin/entrypoint.sh /
 
