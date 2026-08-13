@@ -64,7 +64,7 @@ usageService () {
   need_usage4help="true"
 
   #
-  usageServiceCommands "${1}"
+  usageSubDirCommands "${1}"
 
   # force exit
   exit 0;
