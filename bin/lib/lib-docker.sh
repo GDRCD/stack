@@ -62,8 +62,9 @@ isDockerRunning() {
 isContainerExist() {
   # if container name is passed as argument, i check if it exists
   if [[ "$1" ]]; then
-    if [[ ! "$(docker ps -aq -f name="${PROJECT}_$1")" ]] && [[ ! "$(docker ps -aq -f name="${PROJECT}_$1")" ]]; then
+    if [[ ! "$(docker ps -aq -f name="${PROJECT}_$1")" ]]; then
       prompt -e "Error! Container '${PROJECT}_$1' is not found."
+      prompt -i "Run '${STACK_COMMAND_NAME} recreate' to create it."
       exit 1
     fi
     return 0;
@@ -90,6 +91,7 @@ isContainerExist() {
 
   if [[ $found -eq 0 ]]; then
     prompt -e "Error! No containers found for project '${PROJECT}'."
+    prompt -i "Run '${STACK_COMMAND_NAME} recreate' to create them."
     exit 1
   fi
 }
