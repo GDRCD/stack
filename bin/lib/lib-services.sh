@@ -1,21 +1,5 @@
 #!/bin/bash
 
-# Set Library Name
-LIB_NAME="lib-services.sh"
-
-# Check if STACK_DIR is set
-if [[ ! "${STACK_DIR}" ]]; then
-  echo "Please define 'STACK_DIR' variable"; exit 1
-fi
-
-# Check if lib-core.sh is already imported
-if [[ "${PROCESS_SOURCE[*]}" =~ $LIB_NAME ]]; then
-  echo "Warning! '${LIB_NAME}' is already imported"; exit 1
-fi
-
-# Add lib-core.sh to the list of imported files
-PROCESS_SOURCE=("$LIB_NAME")
-
 # ---------------------------------------------------------------------
 # Variables
 # ---------------------------------------------------------------------
@@ -49,19 +33,6 @@ SERVICE_DESCRIPTIONS=(
 # ---------------------------------------------------------------------
 # Services
 # ---------------------------------------------------------------------
-
-# Check if a value is present in the given list (exact match)
-containsValue() {
-  local needle=$1; shift
-
-  for item in "$@"; do
-    if [[ "$item" == "$needle" ]]; then
-      return 0
-    fi
-  done
-
-  return 1
-}
 
 # Persist the currently enabled optional services to the services file
 saveEnabledServices() {

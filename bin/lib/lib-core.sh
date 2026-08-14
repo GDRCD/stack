@@ -1,8 +1,5 @@
 #!/bin/bash
 
-# Set Library Name
-LIB_NAME="lib-core.sh"
-
 set -Eeo pipefail
 
 # Check if STACK_DIR is set
@@ -11,14 +8,8 @@ if [[ ! "${STACK_DIR}" ]]; then
   exit 1
 fi
 
-# Check if lib-core.sh is already imported
-if [[ "${PROCESS_SOURCE[*]}" =~ $LIB_NAME ]]; then
-  echo "Warning! '${LIB_NAME}' is already imported"
-  exit 1
-fi
-
-# Add lib-core.sh to the list of imported files
-PROCESS_SOURCE=("$LIB_NAME")
+# Libraries already imported
+PROCESS_SOURCE=()
 
 # ---------------------------------------------------------------------
 # Variables
@@ -44,9 +35,25 @@ need_help="false"
 need_usage4help="false"
 has_any_error="false"
 
+# Set the command name
+STACK_COMMAND_NAME="$(basename "${0}")"
+
 # ---------------------------------------------------------------------
-# Messages
+# Utilities
 # ---------------------------------------------------------------------
+
+# Check if a value is present in the given list (exact match)
+containsValue() {
+  local needle=$1; shift
+
+  for item in "$@"; do
+    if [[ "$item" == "$needle" ]]; then
+      return 0
+    fi
+  done
+
+  return 1
+}
 
 # ---------------------------------------------------------------------
 # Import Libraries
@@ -60,14 +67,9 @@ importLib() {
   fi
 
   # Check if library is already imported, if not import it
-  if [[ ! "${PROCESS_SOURCE[*]}" =~ ${1} ]]; then
+  if ! containsValue "${1}" "${PROCESS_SOURCE[@]}"; then
     # shellcheck source=bin/lib/lib-core.sh
     source "${BIN_DIR}/${1}"
     PROCESS_SOURCE+=("${1}")
   fi
 }
-
-# ---------------------------------------------------------------------
-# Commands
-# ---------------------------------------------------------------------
-

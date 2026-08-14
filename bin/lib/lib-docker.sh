@@ -1,23 +1,5 @@
 #!/bin/bash
 
-# Set Library Name
-LIB_NAME="lib-docker.sh"
-
-# Check if STACK_DIR is set
-if [[ ! "${STACK_DIR}" ]]; then
-  echo "Please define 'STACK_DIR' variable"; exit 1
-fi
-
-# Check if lib-core.sh is already imported
-if [[ "${PROCESS_SOURCE[*]}" =~ $LIB_NAME ]]; then
-  echo "Warning! '${LIB_NAME}' is already imported"; exit 1
-fi
-
-# Add lib-core.sh to the list of imported files
-PROCESS_SOURCE=("$LIB_NAME")
-# Set the command name
-STACK_COMMAND_NAME="$(basename "${0}")"
-
 # ---------------------------------------------------------------------
 # Variables
 # ---------------------------------------------------------------------
