@@ -31,7 +31,6 @@ force_upgrade="false"
 MESSAGE_UPGRADE_START="Starting upgrade"
 MESSAGE_UPGRADE_SUCCESS="Upgrade completed!"
 MESSAGE_UPGRADE_UP_TO_DATE="Already up to date"
-MESSAGE_UPGRADE_BUILD="Run the build command to apply the new Dockerfiles"
 
 MESSAGE_CURL_NOT_INSTALLED="'curl' is not installed, please install it first"
 MESSAGE_TAR_NOT_INSTALLED="'tar' is not installed, please install it first"
@@ -41,7 +40,8 @@ MESSAGE_DOWNLOAD_FAILED="Cannot download the release, please check that the vers
 MESSAGE_ARCHIVE_INCOMPLETE="The downloaded archive is incomplete"
 MESSAGE_FETCH_FAILED="Cannot fetch from the remote"
 MESSAGE_CHECKOUT_FAILED="Cannot check out the requested version"
-MESSAGE_STASH_CREATED="Local changes saved in a stash, restore them with 'git stash pop'"
+MESSAGE_PULL_FAILED="Cannot fast forward the branch, please update it manually"
+MESSAGE_GIT_NO_BRANCH="Cannot tell which branch to go back to, check one out manually"
 
 # ---------------------------------------------------------------------
 # Helpers
@@ -50,11 +50,11 @@ MESSAGE_STASH_CREATED="Local changes saved in a stash, restore them with 'git st
 # Function for showing usage of this command
 usage() {
   helpify_title "upgrade" "[OPTIONS...]"
-  helpify_subtitle "Update the stack core to the latest release"; echo;
+  helpify_subtitle "Update the stack core, keeping .env and www untouched"; echo;
   helpify_subtitle "OPTIONS:"
   helpify "-h, --help"          "Show this help"
   helpify "-v, --version <tag>" "Install a specific release (e.g. v2.3.1)"
-  helpify "-f, --force"         "Upgrade even if already up to date"
+  helpify "-f, --force"         "Upgrade even if already up to date, releases only"
 }
 
 # Function for showing usage of this command for help
@@ -96,6 +96,15 @@ getInstalledVersion() {
   if [[ -f "${VERSION_FILE}" ]]; then
     head -n1 "${VERSION_FILE}" | tr -d '[:space:]'
   fi
+}
+
+# Get the branch the remote points at
+getDefaultBranch() {
+  local ref
+
+  ref="$(git -C "${STACK_DIR}" symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null)" || return 1
+
+  echo "${ref#origin/}"
 }
 
 # Get the latest release tag
@@ -155,7 +164,27 @@ finalize_argument_parsing
 
 # Update the stack by downloading and unpacking the release archive
 upgradeFromArchive() {
+  isCurlInstalled
   isTarInstalled
+
+  local current
+  current="$(getInstalledVersion)"
+
+  # Resolve the version to install
+  if [[ -z "${version_tag}" ]]; then
+    if ! version_tag="$(getLatestVersion)"; then
+      message --error "${MESSAGE_VERSION_NOT_RESOLVED}"
+      exit 1
+    fi
+  fi
+
+  # Check if the installed version is already the wanted one
+  if [[ "${current}" == "${version_tag}" ]] && [[ "${force_upgrade}" != "true" ]]; then
+    message --success "${MESSAGE_UPGRADE_UP_TO_DATE} (${current})"
+    return 0
+  fi
+
+  message --stack "${MESSAGE_UPGRADE_START}: ${current:-unknown} -> ${version_tag}"
 
   # Unpack into a staging directory inside STACK_DIR
   local staging="${STACK_DIR}/.stack-upgrade-$$"
@@ -213,67 +242,73 @@ upgradeFromArchive() {
   # Set the permissions
   chmod +x "${STACK_DIR}/stack"
   chmod +x "${STACK_DIR}"/bin/commands/*
-}
-
-# Update the stack with git, stashing local changes
-upgradeFromGit() {
-  isGitInstalled
-
-  # Save local changes on top of the stash stack, leaving older stashes alone.
-  # Ignored files (.env, www, services, logs) are not stashed nor checked out
-  if [[ -n "$(git -C "${STACK_DIR}" status --porcelain)" ]]; then
-    git -C "${STACK_DIR}" stash push --include-untracked --quiet \
-      --message "stack upgrade to ${version_tag}"
-    message --info "${MESSAGE_STASH_CREATED}"
-  fi
-
-  prompt -i "Fetching ${version_tag}..."
-  if ! git -C "${STACK_DIR}" fetch --tags --quiet; then
-    message --error "${MESSAGE_FETCH_FAILED}"
-    exit 1
-  fi
-
-  if ! git -C "${STACK_DIR}" checkout --quiet "${version_tag}"; then
-    message --error "${MESSAGE_CHECKOUT_FAILED}"
-    exit 1
-  fi
-}
-
-upgrade() {
-  # Preliminary checks
-  isCurlInstalled
-
-  local current
-  current="$(getInstalledVersion)"
-
-  # Resolve the version to install
-  if [[ -z "${version_tag}" ]]; then
-    if ! version_tag="$(getLatestVersion)"; then
-      message --error "${MESSAGE_VERSION_NOT_RESOLVED}"
-      exit 1
-    fi
-  fi
-
-  # Check if the installed version is already the wanted one
-  if [[ "${current}" == "${version_tag}" ]] && [[ "${force_upgrade}" != "true" ]]; then
-    message --success "${MESSAGE_UPGRADE_UP_TO_DATE} (${current})"
-    return 0
-  fi
-
-  message --stack "${MESSAGE_UPGRADE_START}: ${current:-unknown} -> ${version_tag}"
-
-  # A git clone is updated with git, everything else with the release archive
-  if isGitClone; then
-    upgradeFromGit
-  else
-    upgradeFromArchive
-  fi
 
   # Save the installed version
   echo "${version_tag}" > "${VERSION_FILE}"
 
   message --success "${MESSAGE_UPGRADE_SUCCESS}"
-  message --info "${MESSAGE_UPGRADE_BUILD}"
+}
+
+# Update the stack with git
+upgradeFromGit() {
+  isGitInstalled
+
+  local branch
+  branch="$(git -C "${STACK_DIR}" rev-parse --abbrev-ref HEAD)"
+
+  if [[ -z "${version_tag}" ]] && [[ "${branch}" == "HEAD" ]]; then
+    if ! branch="$(getDefaultBranch)"; then
+      message --error "${MESSAGE_GIT_NO_BRANCH}"
+      exit 1
+    fi
+  fi
+
+  if [[ -n "${version_tag}" ]]; then
+    message --stack "${MESSAGE_UPGRADE_START}: tag '${version_tag}'"
+  else
+    message --stack "${MESSAGE_UPGRADE_START}: branch '${branch}'"
+  fi
+
+  # Save local changes on top of the stash stack, leaving older stashes alone.
+  # Ignored files (.env, www, services, logs) are never stashed nor checked out
+  if [[ -n "$(git -C "${STACK_DIR}" status --porcelain)" ]]; then
+    git -C "${STACK_DIR}" stash push --include-untracked --quiet \
+      --message "stack upgrade"
+  fi
+
+  prompt -i "Fetching..."
+  if ! git -C "${STACK_DIR}" fetch --tags --quiet; then
+    message --error "${MESSAGE_FETCH_FAILED}"
+    exit 1
+  fi
+
+  if [[ -n "${version_tag}" ]]; then
+    if ! git -C "${STACK_DIR}" checkout --quiet "${version_tag}"; then
+      message --error "${MESSAGE_CHECKOUT_FAILED}"
+      exit 1
+    fi
+  else
+    if ! git -C "${STACK_DIR}" checkout --quiet "${branch}"; then
+      message --error "${MESSAGE_CHECKOUT_FAILED}"
+      exit 1
+    fi
+
+    # Pull the latest changes for the branch
+    if ! git -C "${STACK_DIR}" pull --ff-only --quiet; then
+      message --error "${MESSAGE_PULL_FAILED}"
+      exit 1
+    fi
+  fi
+
+  message --success "${MESSAGE_UPGRADE_SUCCESS}"
+}
+
+upgrade() {
+  if isGitClone; then
+    upgradeFromGit
+  else
+    upgradeFromArchive
+  fi
 }
 
 # Run command if this file is the command file
