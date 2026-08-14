@@ -6,11 +6,11 @@ Questa soluzione è stata pensata prevalentemente per lo sviluppo in locale, si 
 
 ## Requisiti
 
-Per utilizzare lo **_stack_** presente in questa repository, occorre aver installato sul proprio terminale Docker e GIT.
-Di seguito, gli indirizzi con i riferimenti per l'installazione di questi strumenti:
+Per utilizzare lo **_stack_** presente in questa repository, occorre aver installato sul proprio terminale Docker.
+
+Di seguito, l'indirizzo con i riferimenti per l'installazione:
 
 - [Docker Desktop (o Docker Toolbox)](https://www.docker.com/products/docker-desktop)
-- [GIT](https://git-scm.com/downloads)
 
 Su **macOS** occorre inoltre installare le GNU coreutils, da cui lo stack prende `greadlink`:
 
@@ -24,13 +24,21 @@ Occorre avere un minimo di dimestichezza con il terminale per poter utilizzare l
 
 ## Installazione
 
-Per utilizzare **_stack_**, clona il progetto in una qualsiasi cartella sul tuo PC. Puoi farlo scaricando l'intero progetto compresso in una cartella zip oppure utilizzando GIT ed eseguendo il seguente comando:
+Il modo più rapido è lo script di bootstrap, che scarica l'ultima release e la scompatta. Non serve GIT:
 
 ```shell
-git clone https://github.com/GDRCD/stack.git
+curl -fsSL https://raw.githubusercontent.com/GDRCD/stack/master/boot.sh | bash
 ```
 
-Il comando salverà in una cartella `stack` l'intera struttura. Puoi inserirlo in una cartella a tuo piacimento, aggiungendo in fondo al comando sopra indicato il nome della cartella desiderata (qualora non sia presente, la crea in automatico).
+Lo stack finisce in una cartella `stack` nella directory corrente. Per scegliere un'altra destinazione, passala come argomento:
+
+```shell
+curl -fsSL https://raw.githubusercontent.com/GDRCD/stack/master/boot.sh | bash -s -- ~/Progetti/mio-gdrcd
+```
+
+Opzioni disponibili (dopo `--`): `-v <tag>` per installare una versione specifica invece dell'ultima, `-f` per scompattare in una cartella non vuota.
+
+> N.B.: è possibile anche clonare il repository con [GIT](https://git-scm.com/downloads), ma in questo caso occorre avere GIT installato sul proprio terminale. La repository potrebbe subire aggiornamenti con maggiore frequenza e quindi è consigliata per chi vuole contribuire allo sviluppo dello **_stack_**.
 
 Una volta terminato il salvataggio dei file dello stack, occorre inserire il proprio progetto dentro la cartella [`www`](www). Può essere fatto manualmente, così come attraverso `git`.
 Per chi sta iniziando con un nuovo progetto di GDRCD, sarà sufficiente eseguire i seguenti comandi:
@@ -42,7 +50,8 @@ git clone https://github.com/GDRCD/GDRCD.git
 
 > N.B.: potrebbe accadere che questo passaggio dia errore per via della presenza del file `.gitkeep`. Nel caso si può tranquillamente rimuovere quest'ultimo e ritentare lo scarico del progetto.
 
-A questo punto, copiare il file [`sample.env`](sample.env) in un nuovo file [`.env`](.env) e compilare le varie variabili presenti.
+
+A questo punto, è necessario configurare le variabili di ambiente, che vengono lette dallo **_stack_** per la creazione dei container e dei servizi. Queste sono contenute nel file [`.env`](.env). Se non è presente, occorre crearlo copiando il file [`sample.env`](sample.env) e modificandone i valori secondo le proprie necessità.
 È molto importante specificare quale versione di PHP si desidera utilizzare, popolando la variabile `PHP_VERSION` con il numero di versione desiderato tra quelle disponibili.
 
 Di seguito le versioni attualmente supportate, con i relativi riferimenti:
@@ -243,6 +252,15 @@ Ricrea tutti i container e le reti dello stack.
 Opzioni disponibili:
 
 - `-f, --force`: Forza la ricreazione dei container
+
+`./stack upgrade`
+
+Aggiorna il core dello stack all'ultima release, lasciando intatti `.env`, `www`, `services` e `logs`.
+
+Opzioni disponibili:
+
+- `-v, --version <tag>`: Installa una versione specifica (es. `v2.3.1`) invece dell'ultima
+- `-f, --force`: Aggiorna anche se la versione installata è già quella richiesta
 
 `sudo ./stack install`
 

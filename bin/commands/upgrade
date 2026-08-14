@@ -1,0 +1,282 @@
+#!/usr/bin/env bash
+
+importLib "lib/lib-docker.sh"
+
+# ---------------------------------------------------------------------
+# Variables
+# ---------------------------------------------------------------------
+
+# Get current file name
+CURRENT_FILE_NAME="$(basename "${BASH_SOURCE[0]}")"
+
+# Save command name
+args=("$@")
+COMMAND_NAME="${args[0]}"
+
+# Repository to upgrade from
+REPO="GDRCD/stack"
+VERSION_FILE="${STACK_DIR}/.version"
+
+# Paths never replaced by an upgrade
+PRESERVED_PATHS=(".env" "www" "logs" "services" ".git" ".version")
+
+# Commands variables
+version_tag=""
+force_upgrade="false"
+
+# ---------------------------------------------------------------------
+# Messages
+# ---------------------------------------------------------------------
+
+MESSAGE_UPGRADE_START="Starting upgrade"
+MESSAGE_UPGRADE_SUCCESS="Upgrade completed!"
+MESSAGE_UPGRADE_UP_TO_DATE="Already up to date"
+MESSAGE_UPGRADE_BUILD="Run the build command to apply the new Dockerfiles"
+
+MESSAGE_CURL_NOT_INSTALLED="'curl' is not installed, please install it first"
+MESSAGE_TAR_NOT_INSTALLED="'tar' is not installed, please install it first"
+MESSAGE_GIT_NOT_INSTALLED="'git' is not installed, please install it first"
+MESSAGE_VERSION_NOT_RESOLVED="Cannot reach GitHub to resolve the latest release"
+MESSAGE_DOWNLOAD_FAILED="Cannot download the release, please check that the version exists"
+MESSAGE_ARCHIVE_INCOMPLETE="The downloaded archive is incomplete"
+MESSAGE_FETCH_FAILED="Cannot fetch from the remote"
+MESSAGE_CHECKOUT_FAILED="Cannot check out the requested version"
+MESSAGE_STASH_CREATED="Local changes saved in a stash, restore them with 'git stash pop'"
+
+# ---------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------
+
+# Function for showing usage of this command
+usage() {
+  helpify_title "upgrade" "[OPTIONS...]"
+  helpify_subtitle "Update the stack core to the latest release"; echo;
+  helpify_subtitle "OPTIONS:"
+  helpify "-h, --help"          "Show this help"
+  helpify "-v, --version <tag>" "Install a specific release (e.g. v2.3.1)"
+  helpify "-f, --force"         "Upgrade even if already up to date"
+}
+
+# Function for showing usage of this command for help
+usage4help() {
+  helpify "upgrade"       "Update the stack core to the latest release"
+}
+
+# Check if curl is installed
+isCurlInstalled() {
+  if ! command -v curl &> /dev/null; then
+    message --error "${MESSAGE_CURL_NOT_INSTALLED}"
+    exit 1
+  fi
+}
+
+# Check if tar is installed
+isTarInstalled() {
+  if ! command -v tar &> /dev/null; then
+    message --error "${MESSAGE_TAR_NOT_INSTALLED}"
+    exit 1
+  fi
+}
+
+# Check if git is installed
+isGitInstalled() {
+  if ! command -v git &> /dev/null; then
+    message --error "${MESSAGE_GIT_NOT_INSTALLED}"
+    exit 1
+  fi
+}
+
+# Check if the stack is a git clone
+isGitClone() {
+  [[ -d "${STACK_DIR}/.git" ]]
+}
+
+# Get the installed version
+getInstalledVersion() {
+  if [[ -f "${VERSION_FILE}" ]]; then
+    head -n1 "${VERSION_FILE}" | tr -d '[:space:]'
+  fi
+}
+
+# Get the latest release tag
+getLatestVersion() {
+  local url tag
+
+  url="$(curl -fsSL -o /dev/null -w '%{url_effective}' "https://github.com/${REPO}/releases/latest")" || return 1
+
+  tag="${url##*/}"
+  case "${tag}" in
+    v[0-9]*)
+      echo "${tag}" ;;
+    *)
+      return 1 ;;
+  esac
+}
+
+# ---------------------------------------------------------------------
+# Main
+# ---------------------------------------------------------------------
+
+#---------------------------PARSE ARGUMENTS-------------------------------#
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+  # if the argument is the command name, skip it
+  if [[ "$1" == "${COMMAND_NAME}" ]]; then
+    shift
+    continue
+  fi
+
+  case "${1}" in
+  -h | --help)
+    need_help="true"
+    shift
+    ;;
+  -v | --version)
+    version_tag="${2}"
+    shift
+    shift
+    ;;
+  -f | --force)
+    force_upgrade="true"
+    shift
+    ;;
+  *)
+    messageUnknownCommand "$COMMAND_NAME" "$1"
+    exit 1
+    ;;
+  esac
+done
+
+# Execute post argument parsing checks
+finalize_argument_parsing
+
+#---------------------------RUN COMMAND-------------------------------#
+
+# Update the stack by downloading and unpacking the release archive
+upgradeFromArchive() {
+  isTarInstalled
+
+  # Unpack into a staging directory inside STACK_DIR
+  local staging="${STACK_DIR}/.stack-upgrade-$$"
+  rm -rf "${staging}"
+  mkdir -p "${staging}"
+  # shellcheck disable=SC2064
+  trap "rm -rf '${staging}'" EXIT
+
+  prompt -i "Downloading ${version_tag}..."
+  if ! curl -fsSL "https://github.com/${REPO}/archive/refs/tags/${version_tag}.tar.gz" 2> /dev/null |
+    tar -xzf - -C "${staging}" --strip-components=1 2> /dev/null; then
+    message --error "${MESSAGE_DOWNLOAD_FAILED}"
+    exit 1
+  fi
+
+  # Check the archive is complete
+  local entry
+  for entry in stack bin .docker; do
+    if [[ ! -e "${staging}/${entry}" ]]; then
+      message --error "${MESSAGE_ARCHIVE_INCOMPLETE}: '${entry}' is missing"
+      exit 1
+    fi
+  done
+
+  prompt -i "Creating backup..."
+
+  # Backup the core being replaced
+  local installed
+  installed="$(getInstalledVersion)"
+  local backup="${STACK_DIR}/.stack-backup-${installed:-unknown}-$(date +%Y%m%d-%H%M%S)"
+  mkdir -p "${backup}"
+
+  prompt -i "Replacing the core..."
+
+  # Swap with mv only: overwriting in place would truncate the running stack
+  local name
+  for entry in "${staging}"/* "${staging}"/.[!.]*; do
+    if [[ ! -e "${entry}" ]]; then
+      continue
+    fi
+
+    # Skip what belongs to the user
+    name="$(basename "${entry}")"
+    if containsValue "${name}" "${PRESERVED_PATHS[@]}"; then
+      continue
+    fi
+
+    # Replace whole directories, so files removed upstream do not survive
+    if [[ -e "${STACK_DIR}/${name}" ]]; then
+      mv "${STACK_DIR}/${name}" "${backup}/${name}"
+    fi
+    mv "${entry}" "${STACK_DIR}/${name}"
+  done
+
+  # Set the permissions
+  chmod +x "${STACK_DIR}/stack"
+  chmod +x "${STACK_DIR}"/bin/commands/*
+}
+
+# Update the stack with git, stashing local changes
+upgradeFromGit() {
+  isGitInstalled
+
+  # Save local changes on top of the stash stack, leaving older stashes alone.
+  # Ignored files (.env, www, services, logs) are not stashed nor checked out
+  if [[ -n "$(git -C "${STACK_DIR}" status --porcelain)" ]]; then
+    git -C "${STACK_DIR}" stash push --include-untracked --quiet \
+      --message "stack upgrade to ${version_tag}"
+    message --info "${MESSAGE_STASH_CREATED}"
+  fi
+
+  prompt -i "Fetching ${version_tag}..."
+  if ! git -C "${STACK_DIR}" fetch --tags --quiet; then
+    message --error "${MESSAGE_FETCH_FAILED}"
+    exit 1
+  fi
+
+  if ! git -C "${STACK_DIR}" checkout --quiet "${version_tag}"; then
+    message --error "${MESSAGE_CHECKOUT_FAILED}"
+    exit 1
+  fi
+}
+
+upgrade() {
+  # Preliminary checks
+  isCurlInstalled
+
+  local current
+  current="$(getInstalledVersion)"
+
+  # Resolve the version to install
+  if [[ -z "${version_tag}" ]]; then
+    if ! version_tag="$(getLatestVersion)"; then
+      message --error "${MESSAGE_VERSION_NOT_RESOLVED}"
+      exit 1
+    fi
+  fi
+
+  # Check if the installed version is already the wanted one
+  if [[ "${current}" == "${version_tag}" ]] && [[ "${force_upgrade}" != "true" ]]; then
+    message --success "${MESSAGE_UPGRADE_UP_TO_DATE} (${current})"
+    return 0
+  fi
+
+  message --stack "${MESSAGE_UPGRADE_START}: ${current:-unknown} -> ${version_tag}"
+
+  # A git clone is updated with git, everything else with the release archive
+  if isGitClone; then
+    upgradeFromGit
+  else
+    upgradeFromArchive
+  fi
+
+  # Save the installed version
+  echo "${version_tag}" > "${VERSION_FILE}"
+
+  message --success "${MESSAGE_UPGRADE_SUCCESS}"
+  message --info "${MESSAGE_UPGRADE_BUILD}"
+}
+
+# Run command if this file is the command file
+if [[ "${COMMAND_NAME}" == "${CURRENT_FILE_NAME}" ]]; then
+  upgrade
+fi

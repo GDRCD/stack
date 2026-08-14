@@ -14,5 +14,12 @@ logs/*
 www
 !www/.gitkeep
 
-#ENV
+# ENV
 .env
+
+# VERSION
+.version
+
+# UPGRADE
+.stack-backup-*
+.stack-upgrade-*
