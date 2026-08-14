@@ -50,9 +50,6 @@ while [[ $# -gt 0 ]]; do
       shift
       ;;
     *)
-      # Not validated against the enabled services on purpose: enabling a
-      # service that is currently disabled is exactly the point. enableService
-      # validates it against OPTIONAL_SERVICES
       service_name="$1"
       shift
       ;;
