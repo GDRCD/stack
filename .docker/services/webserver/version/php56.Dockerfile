@@ -47,7 +47,7 @@ RUN mkdir -p /run/nginx /etc/nginx/http.d \
  && rm -rf /etc/nginx/conf.d \
  && ln -s /etc/nginx/http.d /etc/nginx/conf.d
 
-# Align www-data with the host user, so files written by PHP stay editable
+# Align www-data with the host user
 RUN groupmod -o -g "${uid}" www-data \
  && usermod  -o -u "${uid}" -g "${uid}" www-data
 

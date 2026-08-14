@@ -42,7 +42,7 @@ RUN apk add --no-cache \
     nginx \
     shadow
 
-# Align www-data with the host user, so files written by PHP stay editable
+# Align www-data with the host user
 RUN groupmod -o -g "${uid}" www-data \
  && usermod  -o -u "${uid}" -g "${uid}" www-data
 
