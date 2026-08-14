@@ -55,6 +55,14 @@ containsValue() {
   return 1
 }
 
+# Check if env file exists
+isEnvFileExists() {
+  if [[ ! -f "${STACK_DIR}/.env" ]]; then
+    prompt -e "Error! '.env' file is not found. Please create it first."
+    exit 1
+  fi
+}
+
 # ---------------------------------------------------------------------
 # Import Libraries
 # ---------------------------------------------------------------------

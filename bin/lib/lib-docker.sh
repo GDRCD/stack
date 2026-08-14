@@ -8,14 +8,6 @@
 # Utilities
 # ---------------------------------------------------------------------
 
-# Check if env file exists
-isEnvFileExists() {
-  if [[ ! -f "${STACK_DIR}/.env" ]]; then
-    prompt -e "Error! '.env' file is not found. Please create it first."
-    exit 1
-  fi
-}
-
 # Check if docker is installed
 isDockerInstalled() {
   if ! command -v docker &> /dev/null; then
@@ -24,9 +16,9 @@ isDockerInstalled() {
   fi
 }
 
-# Check if docker-compose is installed
+# Check if docker compose is installed
 isDockerComposeInstalled() {
-  if ! command -v docker compose &> /dev/null; then
+  if ! docker compose version &> /dev/null; then
     prompt -e "Error! Docker Compose is not installed. Please install it first."
     exit 1
   fi
@@ -55,16 +47,6 @@ isContainerExist() {
   # otherwise, i check if at least one container exists
   local found=0
   for service in "${SERVICES[@]}"; do
-    # database
-    if [[ "$service" == "database" ]]; then
-      if [[ "$(docker ps -aq -f name="${PROJECT}_$service")" ]]; then
-        found=1
-        break
-      fi
-      continue
-    fi
-
-    # other services
     if [[ "$(docker ps -aq -f name="${PROJECT}_$service")" ]]; then
       found=1
       break
@@ -91,15 +73,6 @@ isContainerRunning() {
 
   # otherwise, i check if all containers are running
   for service in "${SERVICES[@]}"; do
-    # database
-    if [[ "$service" == "database" ]]; then
-      if [[ ! "$(docker ps -q -f name="${PROJECT}_$service")" ]]; then
-        prompt -e "Error! Container '${PROJECT}_$service' is not running."
-        exit 1
-      fi
-      continue
-    fi
-    # other services
     if [[ ! "$(docker ps -q -f name="${PROJECT}_$service")" ]]; then
       prompt -e "Error! Container '${PROJECT}_$service' is not running."
       exit 1
@@ -107,8 +80,8 @@ isContainerRunning() {
   done
 }
 
-# Check if docker network exists, otherwise create it
-isStackNetworkExists() {
+# Create the stack network if it does not exist
+createStackNetwork() {
   if [[ ! "$(docker network ls -q -f name=${PROJECT}_network)" ]]; then
     prompt -i "Creating '${PROJECT}_network' docker network... "
     docker network create --driver bridge "${PROJECT}_network"
@@ -120,17 +93,15 @@ isStackNetworkExists() {
 # ---------------------------------------------------------------------
 
 dockerCompose() {
-  # Check if docker compose is installed
+  # Preliminary checks
+  isDockerInstalled
   isDockerComposeInstalled
-  # Check if docker is running
   isDockerRunning
-  # Check if env file exists
   isEnvFileExists
-  # Check if stack network exists, otherwise create it
-  isStackNetworkExists
+  createStackNetwork
 
   # Build profiles array based on enabled services
-  profiles=()
+  local profiles=()
   for service in "${OPTIONAL_SERVICES[@]}"; do
     if isServiceEnabled "$service"; then
       profiles+=("--profile" "$service")
