@@ -36,6 +36,8 @@ prompt() {
       echo -e "  ${c_blue}${2}${c_default}" ;;        # print info low message
     "-t")
       echo -e "  ${c_magenta}${2}${c_default}" ;;     # print title message
+    *)
+      echo -e "  ${c_red}Error: prompt type '${1}' is not valid${c_default}"; exit 1 ;;
   esac
 }
 
@@ -43,7 +45,7 @@ prompt() {
 message()
 {
   # Check if message type is valid
-  if [[ ! "${MESSAGE_OPTIONS[*]}" =~ $1 ]]; then
+  if ! containsValue "${1}" "${MESSAGE_OPTIONS[@]}"; then
     message --error "Message type '${1}' is not valid"; exit 1
   fi
 
@@ -70,7 +72,7 @@ message()
 }
 
 logo() {
-  ascii_art='__   __   __   __   __
+  local ascii_art='__   __   __   __   __
  / _` |  \ |__) /  ` |  \
  \__> |__/ |  \ \__, |__/'
   echo -e "  ${c_blue}${ascii_art}${c_default}";
