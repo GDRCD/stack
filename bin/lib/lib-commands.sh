@@ -59,34 +59,23 @@ messageUnknownCommand () {
 # Misc
 # ---------------------------------------------------------------------
 
-# TODO: rewrite this function to use a better approach
 finalize_argument_parsing() {
-  # if has_any_error is true, exit with error code
+  # Argument parsing failed
   if [[ "${has_any_error}" == "true" ]]; then
-    prompt -i "Try '${STACK_COMMAND_NAME} --help' for more information."; exit 1
+    prompt -i "Try '${STACK_COMMAND_NAME} --help' for more information."
+    exit 1
   fi
 
-  if [[ "${need_help}" == "true" ]]; then
-    # Force to stop the script
-    forceStop="true"
-
-    # HELP > $STACK_COMMAND_NAME
-    if [[ "${need_usage4help}" == "true" && "${1}" != "${STACK_COMMAND_NAME}" ]]; then
-      usage4help;
-      # Continue the script execution
-      forceStop="false"
-    # HELP > $STACK_COMMAND_NAME > Command
-    else
-      usage;
-    fi
-
-    # if has_any_error is true, exit with error code
-    if [[ "${has_any_error}" == "true" ]]; then
-      exit 1
-    fi
-    # if forceStop is true, exit with success code
-    if [[ "${forceStop}" == "true" ]]; then
-      exit 0;
-    fi
+  if [[ "${need_help}" != "true" ]]; then
+    return 0
   fi
+
+  # Sourced to build the command list: print the single line entry and continue
+  if [[ "${need_commands_list}" == "true" ]]; then
+    usage4help
+    return 0
+  fi
+
+  usage
+  exit 0
 }

@@ -32,7 +32,7 @@ export c_yellow="\033[1;33m"
 
 #------------Trigger-----------#
 need_help="false"
-need_usage4help="false"
+need_commands_list="false"
 has_any_error="false"
 
 # Set the command name
