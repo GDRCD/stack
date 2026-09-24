@@ -1,66 +1,10 @@
 #!/usr/bin/env bash
+# @cli.summary: Elenca i servizi opzionali e il loro stato
+# @cli.usage:
 
-importLib "lib/lib-docker.sh"
-
-# Get current file name
-CURRENT_FILE_NAME="$(basename "${BASH_SOURCE[0]}")"
-
-# Save command name
-args=("$@")
-COMMAND_NAME="${args[0]}"
-
-# ---------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------
-
-# Function for showing usage of this command
-usage() {
-  helpify_title "services"
-  helpify_subtitle "List all optional services"; echo;
-  helpify_subtitle "OPTIONS:"
-  helpify "-h, --help"          "Show this help";
-}
-
-# Function for showing usage of this command for help
-usage4help() {
-  helpify "services"       "List all optional services"
-}
-
-# ---------------------------------------------------------------------
-# Main
-# ---------------------------------------------------------------------
-
-#---------------------------PARSE ARGUMENTS-------------------------------#
-
-# Parse arguments
-while [[ $# -gt 0 ]]; do
-  if [[ "$1" == "${COMMAND_NAME}" ]]; then
-    shift; continue
-  fi
-
-  case "$1" in
-    -h|--help)
-      need_help="true"
-      shift
-      ;;
-    *)
-      messageUnknownCommand "${COMMAND_NAME}" "$1"; exit 1
-      ;;
-  esac
+shift
+[[ $# -eq 0 ]] || { messageUnknownCommand services "$1"; exit 2; }
+for SERVICE_NAME in "${OPTIONAL_SERVICES[@]}"; do
+  STATUS="disabilitato"; isServiceEnabled "${SERVICE_NAME}" && STATUS="abilitato"
+  helpify "${SERVICE_NAME}" "$(serviceDescription "${SERVICE_NAME}")" "${STATUS}"
 done
-
-# Execute post argument parsing checks
-finalize_argument_parsing
-
-#---------------------------RUN COMMAND-------------------------------#
-
-services () {
-  # list all optional services
-  prompt -i "List all optional services...";
-  listAllOptionalServices
-}
-
-# Run command if this file is the command file
-if [[ "${COMMAND_NAME}" == "${CURRENT_FILE_NAME}" ]]; then
-  services
-fi

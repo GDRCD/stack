@@ -1,132 +1,34 @@
 #!/usr/bin/env bash
+# @cli.summary: Esporta un database in un dump SQL
+# @cli.usage: [OPTIONS...] DATABASE [FILE]
+# @cli.option: -c, --compress | flag | | Comprime il dump esportato
+# @cli.argument: DATABASE | text | required | Nome del database
+# @cli.argument: FILE | file | optional | File .sql di destinazione
 
 importLib "lib/lib-docker.sh"
-
-# ---------------------------------------------------------------------
-# Variables
-# ---------------------------------------------------------------------
-
-# Get current file name
-CURRENT_FILE_NAME="$(basename "${BASH_SOURCE[0]}")"
-
-# Save command name
-args=("$@")
-COMMAND_NAME="${args[0]}"
-
-# Commands variables
-SERVICE_NAME=""
-DATABASE_NAME=""
-FILE=""
-COMPRESS="false"
-
-# ---------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------
-
-# Function for showing usage of this command
-usage() {
-  helpify_title "export" "[OPTIONS...] database DATABASE_NAME [FILE]"
-  helpify_subtitle "Export a database into a dump file"; echo;
-  helpify_subtitle "OPTIONS:"
-  helpify "-h, --help"          "Show this help"
-  helpify "-c, --compress"      "Export a compressed dump file"
-}
-
-# Function for showing usage of this command for help
-usage4help() {
-  helpify "export"       "Export a database into a dump file"
-}
-
-# ---------------------------------------------------------------------
-# Main
-# ---------------------------------------------------------------------
-
-#---------------------------PARSE ARGUMENTS-------------------------------#
-
-# Parse arguments
+shift
+COMPRESS="false"; DATABASE_NAME=""; FILE=""
 while [[ $# -gt 0 ]]; do
-  # if the argument is the command name, skip it
-  if [[ "$1" == "${COMMAND_NAME}" ]]; then
-    shift; continue
-  fi
-
-  #
   case "$1" in
-    -h|--help)
-      need_help="true"; shift;
-      ;;
-    -c|--compress)
-      COMPRESS="true"; shift;
-	  ;;
-    *)
-    	# First argument is the service this command applies to
-    	if [[ -z "${SERVICE_NAME}" ]]; then
-    		SERVICE_NAME="$1"; shift;
-    	# Second argument is the database name
-    	elif [[ -z "${DATABASE_NAME}" ]]; then
-    		DATABASE_NAME="$1"; shift;
-    	# Third argument is the file
-      elif [[ -z "${FILE}" ]]; then
-        FILE="$1"; shift;
-      # Other arguments are not allowed
-      else
-        messageUnknownCommand "${COMMAND_NAME}" "$1"; exit 1;
-      fi
-      ;;
+    -c | --compress) COMPRESS="true"; shift ;;
+    *) if [[ -z "${DATABASE_NAME}" ]]; then DATABASE_NAME="$1"; elif [[ -z "${FILE}" ]]; then FILE="$1"; else messageUnknownCommand export "$1"; exit 2; fi; shift ;;
   esac
 done
-
-# Execute post argument parsing checks
-finalize_argument_parsing
-
-#---------------------------RUN COMMAND-------------------------------#
-
-runExport() {
-  # Only the database service can be exported
-  if [[ "${SERVICE_NAME}" != "database" ]]; then
-    prompt -e "Error! '${COMMAND_NAME}' only works with the 'database' service."
-    usage
-    exit 1
-  fi
-
-  # Preliminary checks
-  isContainerExist "${SERVICE_NAME}"
-  isContainerRunning "${SERVICE_NAME}"
-
-  # Check if database name is empty
-  if [[ -z "${DATABASE_NAME}" ]]; then
-  	prompt -e "Database name is required";
-  	exit 1;
-  fi
-
-  # Check if file is empty, set default file name
-  if [[ -z "${FILE}" ]]; then
-  	FILE="${DATABASE_NAME}.sql"
-  fi
-
-  # Check if file name is a dump file
-  if [[ "${FILE}" != *.sql ]]; then
-  	prompt -e "File name must be a dump file (.sql)";
-  	exit 1;
-  fi
-
-  # Remove previous file if exists
-  if [[ -f "${FILE}" ]]; then
-    rm "${FILE}"
-  fi
-
-  #
-  prompt -i "Exporting ${DATABASE_NAME} into ${FILE} file..."
-  docker exec -i "${PROJECT}"_database mysqldump --routines -uroot -p"${MYSQL_ROOT_PASSWORD}" "${DATABASE_NAME}" > "${FILE}" || exit 1
-
-  # Execute gzip if compress option is true
-  if [[ "${COMPRESS}" == "true" ]]; then
-    prompt -i "Compressing ${FILE} file..."
-    gzip "${FILE}"
-  fi
-}
-
-# Run command if this file is the command file
-if [[ "${COMMAND_NAME}" == "${CURRENT_FILE_NAME}" ]]; then
-  runExport
-fi
+[[ "${DATABASE_NAME}" =~ ^[[:alnum:]_]+$ ]] || { prompt -e "Nome database non valido."; exit 2; }
+FILE="${FILE:-${DATABASE_NAME}.sql}"
+[[ "${FILE}" == *.sql ]] || { prompt -e "Il file deve avere estensione .sql."; exit 2; }
+OUTPUT="${FILE}"; [[ "${COMPRESS}" != "true" ]] || OUTPUT="${FILE}.gz"
+OUTPUT_DIR="$(dirname "${OUTPUT}")"
+[[ -d "${OUTPUT_DIR}" && -w "${OUTPUT_DIR}" ]] || { prompt -e "Directory di destinazione non scrivibile."; exit 1; }
+isContainerExist database; isContainerRunning database
+TEMP_SQL="$(mktemp "${OUTPUT_DIR}/.$(basename "${OUTPUT}").XXXXXX")"
+TEMP_OUTPUT="${TEMP_SQL}"
+trap 'rm -f -- "${TEMP_SQL}" "${TEMP_OUTPUT}"' EXIT
+prompt -i "Esportazione di ${DATABASE_NAME} in ${OUTPUT}..."
+dockerCompose exec -T -e "MYSQL_PWD=${MYSQL_ROOT_PASSWORD}" database \
+  mysqldump --routines -uroot "${DATABASE_NAME}" >"${TEMP_SQL}"
+if [[ "${COMPRESS}" == "true" ]]; then TEMP_OUTPUT="${TEMP_SQL}.gz"; gzip -c -- "${TEMP_SQL}" >"${TEMP_OUTPUT}"; fi
+mv -f -- "${TEMP_OUTPUT}" "${OUTPUT}"
+rm -f -- "${TEMP_SQL}"
+trap - EXIT
+prompt -s "Dump creato: ${OUTPUT}"

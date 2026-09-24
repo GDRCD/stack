@@ -159,9 +159,12 @@ while [[ $# -gt 0 ]]; do
     exit 0
     ;;
   -v | --version)
+    if [[ $# -lt 2 || -z "${2}" || "${2}" == -* ]]; then
+      prompt -e "${MESSAGE_UNKNOWN_OPTION}: ${1} richiede un tag"
+      exit 2
+    fi
     version_tag="${2}"
-    shift
-    shift
+    shift 2
     ;;
   -f | --force)
     force_install="true"
@@ -173,6 +176,10 @@ while [[ $# -gt 0 ]]; do
     exit 1
     ;;
   *)
+    if [[ -n "${target}" ]]; then
+      prompt -e "È possibile indicare una sola directory di destinazione"
+      exit 2
+    fi
     target="${1}"
     shift
     ;;

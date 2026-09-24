@@ -1,88 +1,12 @@
 #!/usr/bin/env bash
+# @cli.summary: Ferma tutti i container o quelli indicati
+# @cli.usage: [SERVICE...]
+# @cli.argument: SERVICE... | service | repeatable | Servizi da fermare
 
 importLib "lib/lib-docker.sh"
-
-# ---------------------------------------------------------------------
-# Variables
-# ---------------------------------------------------------------------
-
-# Get current file name
-CURRENT_FILE_NAME="$(basename "${BASH_SOURCE[0]}")"
-
-# Save command name
-args=("$@")
-COMMAND_NAME="${args[0]}"
-SERVICE_NAMES=()
-# ---------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------
-
-# Function for showing usage of this command
-usage() {
-  helpify_title "stop" "[OPTIONS...] [<service>...]"
-  helpify_subtitle "Stop all containers or only the specified ones"; echo;
-  helpify_subtitle "OPTIONS:"
-  helpify "-h, --help" "Show this help"
-}
-
-# Function for showing usage of this command for help
-usage4help() {
-  helpify "stop" "Stop all containers or only the specified ones"
-}
-
-# ---------------------------------------------------------------------
-# Main
-# ---------------------------------------------------------------------
-
-#---------------------------PARSE ARGUMENTS-------------------------------#
-
-# Parse arguments
-while [[ $# -gt 0 ]]; do
-  # if the argument is the command name, skip it
-  if [[ "$1" == "${COMMAND_NAME}" ]]; then
-    shift
-    continue
-  fi
-
-  #
-  case "$1" in
-  -h | --help)
-    need_help="true"
-    shift
-    ;;
-  *)
-    if isServiceEnabled "$1"; then
-      SERVICE_NAMES+=("$1")
-      shift
-    else
-      messageUnknownCommand "$COMMAND_NAME" "$1"
-      exit 1
-    fi
-    ;;
-  esac
-done
-
-# Execute post argument parsing checks
-finalize_argument_parsing
-
-#---------------------------RUN COMMAND-------------------------------#
-
-stop() {
-  if [[ ${#SERVICE_NAMES[@]} -eq 0 ]]; then
-    # Preliminary checks
-    isContainerExist
-    prompt -i "Stopping all containers..."
-    dockerCompose stop
-  else
-    for SERVICE_NAME in "${SERVICE_NAMES[@]}"; do
-      isContainerExist "${SERVICE_NAME}"
-      prompt -i "Stopping container '${SERVICE_NAME}' ...\n"
-      dockerCompose stop "${SERVICE_NAME}"
-    done
-  fi
-}
-
-# Run command if this file is the command file
-if [[ "${COMMAND_NAME}" == "${CURRENT_FILE_NAME}" ]]; then
-  stop
+shift
+SERVICE_NAMES=("$@")
+for SERVICE_NAME in "${SERVICE_NAMES[@]}"; do isServiceEnabled "${SERVICE_NAME}" || { messageUnknownCommand stop "${SERVICE_NAME}"; exit 2; }; done
+if [[ ${#SERVICE_NAMES[@]} -eq 0 ]]; then isContainerExist; dockerCompose stop; else
+  for SERVICE_NAME in "${SERVICE_NAMES[@]}"; do isContainerExist "${SERVICE_NAME}"; dockerCompose stop "${SERVICE_NAME}"; done
 fi

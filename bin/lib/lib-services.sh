@@ -1,145 +1,74 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-# ---------------------------------------------------------------------
-# Variables
-# ---------------------------------------------------------------------
+if [[ "${STACK_SERVICES_LOADED:-false}" == "true" ]]; then return 0; fi
+readonly STACK_SERVICES_LOADED="true"
 
-# ------------Services--------------#
-CORE_SERVICES=("webserver" "database")
-OPTIONAL_SERVICES=("phpmyadmin" "mailhog")
-
-# Combine CORE_SERVICES and the services from services (only the enabled ones)
-SERVICES=()
+CORE_SERVICES=(webserver database)
+OPTIONAL_SERVICES=(phpmyadmin mailhog)
+SERVICE_DESCRIPTIONS=(
+  "phpmyadmin|Interfaccia web per la gestione MySQL"
+  "mailhog|Strumento per testare l'invio email"
+)
 SERVICES=("${CORE_SERVICES[@]}")
+
+trim_value() {
+  local value="$1"
+  value="${value#"${value%%[![:space:]]*}"}"
+  value="${value%"${value##*[![:space:]]}"}"
+  printf '%s' "${value}"
+}
+
+containsValue() {
+  local needle="$1" item
+  shift
+  for item in "$@"; do [[ "${item}" == "${needle}" ]] && return 0; done
+  return 1
+}
+
 if [[ -f "${STACK_DIR}/services" ]]; then
-  # Read comma-separated services from file
-  while IFS=',' read -ra ENABLED || [[ ${#ENABLED[@]} -gt 0 ]]; do
-    for service in "${ENABLED[@]}"; do
-      # Trim whitespace
-      service=$(echo "$service" | xargs)
-      if [[ -n "$service" ]]; then
-        SERVICES+=("$service")
-      fi
+  while IFS=',' read -r -a enabled || [[ ${#enabled[@]} -gt 0 ]]; do
+    for service in "${enabled[@]}"; do
+      service="$(trim_value "${service}")"
+      [[ -z "${service}" ]] && continue
+      is_optional="false"
+      containsValue "${service}" "${OPTIONAL_SERVICES[@]}" && is_optional="true"
+      [[ "${is_optional}" == "true" ]] && SERVICES+=("${service}")
     done
-  done < "${STACK_DIR}/services"
+  done <"${STACK_DIR}/services"
 fi
 
-# ------------Services Descriptions--------------#
-SERVICE_DESCRIPTIONS=(
-  "phpmyadmin:Web interface for MySQL database management"
-  "mailhog:Email testing tool for local development"
-)
+listServices() { printf '%s\n' "${SERVICES[@]}"; }
+listOptionalServices() { printf '%s\n' "${OPTIONAL_SERVICES[@]}"; }
+isServiceEnabled() { containsValue "$1" "${SERVICES[@]}"; }
+isOptionalService() { containsValue "$1" "${OPTIONAL_SERVICES[@]}"; }
 
-# ---------------------------------------------------------------------
-# Services
-# ---------------------------------------------------------------------
+serviceDescription() {
+  local record
+  for record in "${SERVICE_DESCRIPTIONS[@]}"; do
+    [[ "${record%%|*}" == "$1" ]] && { printf '%s\n' "${record#*|}"; return; }
+  done
+}
 
-# Persist the currently enabled optional services to the services file
 saveEnabledServices() {
+  local service IFS=,
   local enabled=()
   for service in "${SERVICES[@]}"; do
-    if ! containsValue "$service" "${CORE_SERVICES[@]}"; then
-      enabled+=("$service")
-    fi
+    containsValue "${service}" "${CORE_SERVICES[@]}" || enabled+=("${service}")
   done
-
-  # Write them back comma-separated
-  local IFS=','
-  echo "${enabled[*]}" > "${STACK_DIR}/services"
+  printf '%s\n' "${enabled[*]}" >"${STACK_DIR}/services"
 }
 
-# Get only enabled optional services
-getOptionalServices() {
-  local services=()
-  for service in "${SERVICES[@]}"; do
-    if ! containsValue "$service" "${CORE_SERVICES[@]}"; then
-      services+=("$service")
-    fi
-  done
-  echo "${services[@]}"
-}
-
-# Get all available optional services
-getAllOptionalServices() {
-  echo "${OPTIONAL_SERVICES[@]}"
-}
-
-# Get service description
-getServiceDescription() {
-  local service=$1
-
-  for desc in "${SERVICE_DESCRIPTIONS[@]}"; do
-    IFS=':' read -r svc description <<< "$desc"
-    if [[ "$svc" == "$service" ]]; then
-      echo "$description"
-      return
-    fi
-  done
-
-  echo "No description available"
-}
-
-listAllOptionalServices() {
-  # Get all optional services
-  services=($(getAllOptionalServices))
-
-  # Print each service with its status and description
-  for service in "${services[@]}"; do
-
-    status="disabled"
-    if isServiceEnabled "$service"; then
-      status="enabled"
-    fi
-
-    description=$(getServiceDescription "$service")
-
-    helpify "$service" "$description" "Status: $status"
-  done
-}
-
-# Check if service is enabled
-isServiceEnabled() {
-  local service=$1
-  containsValue "$service" "${SERVICES[@]}"
-}
-
-# Enable a service
 enableService() {
-  local service=$1
-
-  # Validate service exists
-  if ! containsValue "$service" "${OPTIONAL_SERVICES[@]}"; then
-    message --error "Service '$service' not found"
-    return 1
-  fi
-
-  # Enable the service if not already enabled
-  if ! isServiceEnabled "$service"; then
-    SERVICES+=("$service")
-    saveEnabledServices
-  fi
+  isOptionalService "$1" || return 2
+  isServiceEnabled "$1" || SERVICES+=("$1")
+  saveEnabledServices
 }
 
-# Disable a service
 disableService() {
-  local service=$1
-
-  # Validate service exists
-  if ! containsValue "$service" "${OPTIONAL_SERVICES[@]}"; then
-    message --error "Service '$service' not found"
-    return 1
-  fi
-
-  # Drop only this service
-  if isServiceEnabled "$service"; then
-    local remaining=()
-    for item in "${SERVICES[@]}"; do
-      if [[ "$item" != "$service" ]]; then
-        remaining+=("$item")
-      fi
-    done
-
-    SERVICES=("${remaining[@]}")
-    saveEnabledServices
-  fi
+  local service
+  local remaining=()
+  isOptionalService "$1" || return 2
+  for service in "${SERVICES[@]}"; do [[ "${service}" == "$1" ]] || remaining+=("${service}"); done
+  SERVICES=("${remaining[@]}")
+  saveEnabledServices
 }

@@ -1,81 +1,15 @@
 #!/usr/bin/env bash
+# @cli.summary: Abilita uno o più servizi opzionali
+# @cli.usage: SERVICE...
+# @cli.argument: SERVICE... | optional-service | repeatable | Servizi opzionali da abilitare
 
 importLib "lib/lib-docker.sh"
-
-# Get current file name
-CURRENT_FILE_NAME="$(basename "${BASH_SOURCE[0]}")"
-
-# Save command name
-args=("$@")
-COMMAND_NAME="${args[0]}"
-
-# ---------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------
-
-# Function for showing usage of this command
-usage() {
-  helpify_title "enable" "<service>"
-  helpify_subtitle "Enable optional services"; echo;
-
-  helpify_subtitle "SERVICES:"
-  listAllOptionalServices; echo;
-
-  helpify_subtitle "OPTIONS:"
-  helpify "-h, --help"          "Show this help";
-}
-
-# Function for showing usage of this command for help
-usage4help() {
-  helpify "enable"       "Enable optional services"
-}
-
-# ---------------------------------------------------------------------
-# Main
-# ---------------------------------------------------------------------
-
-#---------------------------PARSE ARGUMENTS-------------------------------#
-
-service_name=""
-
-# Parse arguments
-while [[ $# -gt 0 ]]; do
-  if [[ "$1" == "${COMMAND_NAME}" ]]; then
-    shift; continue
-  fi
-
-  case "$1" in
-    -h|--help)
-      need_help="true"
-      shift
-      ;;
-    *)
-      service_name="$1"
-      shift
-      ;;
-  esac
+shift
+[[ $# -gt 0 ]] || { prompt -e "Indica almeno un servizio."; exit 2; }
+REQUESTED_SERVICES=("$@")
+for SERVICE_NAME in "${REQUESTED_SERVICES[@]}"; do
+  isOptionalService "${SERVICE_NAME}" || { prompt -e "Servizio opzionale sconosciuto: ${SERVICE_NAME}"; exit 2; }
 done
-
-# Execute post argument parsing checks
-finalize_argument_parsing
-
-# Validate required arguments
-if [[ -z "$service_name" ]] && [[ "$need_help" != "true" ]]; then
-  usage
-  exit 1
-fi
-
-#---------------------------RUN COMMAND-------------------------------#
-
-runEnable () {
-  enableService "$service_name"
-  message --success "Service $service_name enabled"
-
-  # Restart containers to apply changes
-  dockerCompose up -d
-}
-
-# Run command if this file is the command file
-if [[ "${COMMAND_NAME}" == "${CURRENT_FILE_NAME}" ]]; then
-  runEnable
-fi
+for SERVICE_NAME in "${REQUESTED_SERVICES[@]}"; do enableService "${SERVICE_NAME}"; done
+dockerCompose up -d
+prompt -s "Servizi abilitati: ${REQUESTED_SERVICES[*]}"

@@ -1,183 +1,48 @@
 #!/usr/bin/env bash
+# @cli.summary: Installa il comando globale e l'integrazione shell
+# @cli.usage: [OPTIONS...]
+# @cli.option: -t, --target | directory | PATH | Directory di installazione
+# @cli.option: -f, --force | flag | | Sostituisce una precedente installazione dello stesso stack
+# @cli.option: --shell | enum(bash,zsh) | SHELL | Seleziona la shell da configurare
+# @cli.option: --shell-hook | flag | | Abilita esplicitamente l'integrazione shell
+# @cli.option: --no-shell-hook | flag | | Non modifica i file di avvio della shell
 
-importLib "lib/lib-docker.sh"
-
-# ---------------------------------------------------------------------
-# Variables
-# ---------------------------------------------------------------------
-
-# Get current file name
-CURRENT_FILE_NAME="$(basename "${BASH_SOURCE[0]}")"
-
-# Save command name
-args=("$@")
-COMMAND_NAME="${args[0]}"
-
-# If the script is run as root, install in /usr/local/bin, otherwise in $HOME/.local/bin
-if [[ "$(id -u)" -eq 0 ]]; then
-  is_root="true"
-  default_target="/usr/local/bin"
-else
-  is_root="false"
-  default_target="${HOME}/.local/bin"
-fi
-
-# ---------------------------------------------------------------------
-# Messages
-# ---------------------------------------------------------------------
-
-MESSAGE_INSTALL_START="Starting installation"
-MESSAGE_INSTALL_ALREADY_INSTALLED="Already installed!"
-MESSAGE_INSTALL_SUCCESS="Installation completed!"
-MESSAGE_INSTALL_FAILED="Installation failed!"
-
-MESSAGE_TARGET_NOT_WRITABLE="Target path is not writable with the current user, please check the permissions or run the script as root"
-MESSAGE_TARGET_NOT_DIRECTORY="Target path is not a directory, please check the path or run the script as root"
-
-# ---------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------
-
-usage() {
-  helpify_title "install" "[OPTIONS...]"
-  helpify_subtitle "Installing GDRCD development stack"
-  echo
-  helpify_subtitle "OPTIONS:"
-  helpify "-h, --help" "Show this help"
-  helpify "-t, --target" "Set the global command installation path" "[default: ${default_target}]"
-  helpify "-f, --force" "Force reinstallation of global command"
-}
-
-usage4help() {
-  helpify "install" "Installing the GDRCD development stack"
-}
-
-# ---------------------------------------------------------------------
-# Main
-# ---------------------------------------------------------------------
-
-#---------------------------PARSE ARGUMENTS-------------------------------#
-
-# Set default values
-target=""
-force_reinstall="false"
-shell_type="$(basename "$SHELL")"
-rc_file=""
-
-# Parse arguments
+importLib "lib/lib-shell-integration.sh"
+shift
+if [[ "$(id -u)" -eq 0 ]]; then TARGET_DEFAULT="/usr/local/bin"; INSTALL_HOOK="false"; else TARGET_DEFAULT="${HOME}/.local/bin"; INSTALL_HOOK="true"; fi
+TARGET="${TARGET_DEFAULT}"; FORCE="false"; TARGET_SHELL=""
 while [[ $# -gt 0 ]]; do
-  # if the argument is the command name, skip it
-  if [[ "$1" == "${COMMAND_NAME}" ]]; then
-    shift
-    continue
-  fi
-
-  case "${1}" in
-  -h | --help)
-    need_help="true"
-    shift
-    ;;
-  -t | --target)
-    target="${2}"
-    shift
-    shift
-    ;;
-  -f | --force)
-    force_reinstall="true"
-    shift
-    ;;
-  *)
-    messageUnknownCommand "$COMMAND_NAME" "$1"
-    exit 1
-    ;;
+  case "$1" in
+    -t | --target) require_option_value "$1" "${2:-}" || exit $?; TARGET="$2"; shift 2 ;;
+    -f | --force) FORCE="true"; shift ;;
+    --shell) require_option_value "$1" "${2:-}" || exit $?; case "$2" in bash | zsh) TARGET_SHELL="$2" ;; *) prompt -e "Shell non supportata: $2"; exit 2 ;; esac; INSTALL_HOOK="true"; shift 2 ;;
+    --shell-hook) INSTALL_HOOK="true"; shift ;;
+    --no-shell-hook) INSTALL_HOOK="false"; shift ;;
+    *) messageUnknownCommand install "$1"; exit 2 ;;
   esac
 done
 
-# Execute post argument parsing checks
-finalize_argument_parsing
-
-# Fall back to the default target when option --target was not given
-if [[ -z "${target}" ]]; then
-  target="${default_target}"
-  target_is_default="true"
-else
-  target_is_default="false"
+FINAL_NAME="${PROJECT:-stack}"
+validate_shell_integration_name "${FINAL_NAME}" || { prompt -e "Nome comando non valido: ${FINAL_NAME}"; exit 2; }
+mkdir -p -- "${TARGET}"
+TARGET="$(cd -P "${TARGET}" && pwd)"
+[[ -w "${TARGET}" ]] || { prompt -e "Directory non scrivibile: ${TARGET}"; exit 1; }
+DESTINATION="${TARGET}/${FINAL_NAME}"
+if [[ -e "${DESTINATION}" || -L "${DESTINATION}" ]]; then
+  [[ "${FORCE}" == "true" ]] || { prompt -e "${DESTINATION} esiste già; usa --force."; exit 1; }
+  [[ -L "${DESTINATION}" ]] || { prompt -e "Rifiuto di sostituire un file non simbolico."; exit 1; }
+  RESOLVED="$(canonicalize_path "${DESTINATION}" 2>/dev/null || true)"
+  [[ "${RESOLVED}" == "${STACK_ENTRYPOINT}" ]] || { prompt -e "Il link appartiene a un'altra installazione."; exit 1; }
+  rm -f -- "${DESTINATION}"
 fi
+ln -s -- "${STACK_ENTRYPOINT}" "${DESTINATION}"
 
-#---------------------------RUN COMMAND-------------------------------#
-
-install() {
-  # Check if the target path is the default one and if the script is run as root
-  if [[ "${is_root}" == "true" && "${target_is_default}" == "true" ]]; then
-    message --info "Running as root: installing system wide in ${target} instead of a user directory."
-  fi
-
-  message --stack "${MESSAGE_INSTALL_START} in ${target}"
-
-  # Ensure the target directory exists, create it if it doesn't
-  mkdir -p "${target}" 2>/dev/null || true
-
-  # Check if the target path is a directory
-  if [[ ! -d "$target" ]]; then
-    message --error "${MESSAGE_TARGET_NOT_DIRECTORY}"
-    exit 1
-  fi
-
-  # Check if the target path is writable
-  if [[ ! -w "$target" ]]; then
-    message --error "${MESSAGE_TARGET_NOT_WRITABLE}"
-    exit 1
-  fi
-
-  # Set final command name
-  local final_command_name="${PROJECT:-${STACK_COMMAND_NAME}}"
-
-  # Check if gdrcd is already installed
-  if [[ -f "${target}/${final_command_name}" ]]; then
-    if [[ "${force_reinstall}" == "true" ]]; then
-      rm -f "${target}/${final_command_name}"
-    else
-      message --error "${MESSAGE_INSTALL_ALREADY_INSTALLED}"
-      exit 1
-    fi
-  fi
-
-  # Determine the shell type and the appropriate rc file to modify
-  if [[ ":$PATH:" != *":${target}:"* ]]; then
-    if [[ "${is_root}" == "true" ]]; then
-      # No need to modify the rc of root
-      message --info "${target} is not in your PATH, please add it manually."
-    elif [[ "${shell_type}" == "zsh" ]]; then
-      rc_file="$HOME/.zshrc"
-    elif [[ "${shell_type}" == "bash" ]]; then
-      rc_file="$HOME/.bashrc"
-    else
-      message --error "Unsupported shell: ${shell_type}. Please add ${target} to your PATH manually."
-      exit 1
-    fi
-
-    if [[ -n "${rc_file}" ]]; then
-      echo "export PATH=\"${target}:\$PATH\"" >>"$rc_file"
-      message --info "Added ${target} to PATH in ${rc_file}. Please restart your terminal or run 'source ${rc_file}' to apply the changes."
-    fi
-  fi
-
-  # Create link to the gdrcd binary
-  ln -sf "${STACK_DIR}/${STACK_COMMAND_NAME}" "$target/${final_command_name}" 2>/dev/null
-
-  # Set the permissions
-  chmod +x "$target/${final_command_name}"
-
-  # Check if the installation was successful
-  if [[ -f "$target/${final_command_name}" ]]; then
-    message --success "${MESSAGE_INSTALL_SUCCESS}"
-  else
-    message --error "${MESSAGE_INSTALL_FAILED}"
-    exit 1
-  fi
-}
-
-# Run command if this file is the command file
-if [[ "${COMMAND_NAME}" == "${CURRENT_FILE_NAME}" ]]; then
-  install
+if [[ "${INSTALL_HOOK}" == "true" ]]; then
+  SHELL_NAME="${TARGET_SHELL:-${SHELL##*/}}"
+  case "${SHELL_NAME}" in bash | zsh) ;; *) SHELL_NAME="bash" ;; esac
+  install_shell_integration "${FINAL_NAME}" "${SHELL_NAME}" "${TARGET}"
+  prompt -i "Integrazione ${SHELL_NAME} installata; apri una nuova shell."
+elif [[ ":${PATH}:" != *":${TARGET}:"* ]]; then
+  prompt -i "Per questa sessione: export PATH=\"${TARGET}:\$PATH\""
 fi
+prompt -s "Installazione completata: ${DESTINATION}"

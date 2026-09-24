@@ -1,317 +1,78 @@
 #!/usr/bin/env bash
+# @cli.summary: Aggiorna il core dello stack preservando i dati utente
+# @cli.usage: [OPTIONS...]
+# @cli.option: -v, --version | text | TAG | Installa una release specifica
+# @cli.option: -f, --force | flag | | Reinstalla una release già presente
 
-importLib "lib/lib-docker.sh"
-
-# ---------------------------------------------------------------------
-# Variables
-# ---------------------------------------------------------------------
-
-# Get current file name
-CURRENT_FILE_NAME="$(basename "${BASH_SOURCE[0]}")"
-
-# Save command name
-args=("$@")
-COMMAND_NAME="${args[0]}"
-
-# Repository to upgrade from
-REPO="GDRCD/stack"
+shift
+REPOSITORY="GDRCD/stack"
 VERSION_FILE="${STACK_DIR}/.version"
-
-# Paths never replaced by an upgrade
-PRESERVED_PATHS=(".env" "www" "logs" "services" ".git" ".version")
-
-# Commands variables
-version_tag=""
-force_upgrade="false"
-
-# ---------------------------------------------------------------------
-# Messages
-# ---------------------------------------------------------------------
-
-MESSAGE_UPGRADE_START="Starting upgrade"
-MESSAGE_UPGRADE_SUCCESS="Upgrade completed!"
-MESSAGE_UPGRADE_UP_TO_DATE="Already up to date"
-
-MESSAGE_CURL_NOT_INSTALLED="'curl' is not installed, please install it first"
-MESSAGE_TAR_NOT_INSTALLED="'tar' is not installed, please install it first"
-MESSAGE_GIT_NOT_INSTALLED="'git' is not installed, please install it first"
-MESSAGE_VERSION_NOT_RESOLVED="Cannot reach GitHub to resolve the latest release"
-MESSAGE_DOWNLOAD_FAILED="Cannot download the release, please check that the version exists"
-MESSAGE_ARCHIVE_INCOMPLETE="The downloaded archive is incomplete"
-MESSAGE_FETCH_FAILED="Cannot fetch from the remote"
-MESSAGE_CHECKOUT_FAILED="Cannot check out the requested version"
-MESSAGE_PULL_FAILED="Cannot fast forward the branch, please update it manually"
-MESSAGE_GIT_NO_BRANCH="Cannot tell which branch to go back to, check one out manually"
-
-# ---------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------
-
-# Function for showing usage of this command
-usage() {
-  helpify_title "upgrade" "[OPTIONS...]"
-  helpify_subtitle "Update the stack core, keeping .env and www untouched"; echo;
-  helpify_subtitle "OPTIONS:"
-  helpify "-h, --help"          "Show this help"
-  helpify "-v, --version <tag>" "Install a specific release (e.g. v2.3.1)"
-  helpify "-f, --force"         "Upgrade even if already up to date, releases only"
-}
-
-# Function for showing usage of this command for help
-usage4help() {
-  helpify "upgrade"       "Update the stack core to the latest release"
-}
-
-# Check if curl is installed
-isCurlInstalled() {
-  if ! command -v curl &> /dev/null; then
-    message --error "${MESSAGE_CURL_NOT_INSTALLED}"
-    exit 1
-  fi
-}
-
-# Check if tar is installed
-isTarInstalled() {
-  if ! command -v tar &> /dev/null; then
-    message --error "${MESSAGE_TAR_NOT_INSTALLED}"
-    exit 1
-  fi
-}
-
-# Check if git is installed
-isGitInstalled() {
-  if ! command -v git &> /dev/null; then
-    message --error "${MESSAGE_GIT_NOT_INSTALLED}"
-    exit 1
-  fi
-}
-
-# Check if the stack is a git clone
-isGitClone() {
-  [[ -d "${STACK_DIR}/.git" ]]
-}
-
-# Get the installed version
-getInstalledVersion() {
-  if [[ -f "${VERSION_FILE}" ]]; then
-    head -n1 "${VERSION_FILE}" | tr -d '[:space:]'
-  fi
-}
-
-# Get the branch the remote points at
-getDefaultBranch() {
-  local ref
-
-  ref="$(git -C "${STACK_DIR}" symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null)" || return 1
-
-  echo "${ref#origin/}"
-}
-
-# Get the latest release tag
-getLatestVersion() {
-  local url tag
-
-  url="$(curl -fsSL -o /dev/null -w '%{url_effective}' "https://github.com/${REPO}/releases/latest")" || return 1
-
-  tag="${url##*/}"
-  case "${tag}" in
-    v[0-9]*)
-      echo "${tag}" ;;
-    *)
-      return 1 ;;
-  esac
-}
-
-# ---------------------------------------------------------------------
-# Main
-# ---------------------------------------------------------------------
-
-#---------------------------PARSE ARGUMENTS-------------------------------#
-
-# Parse arguments
+VERSION_TAG=""; FORCE_UPGRADE="false"
+PRESERVED_PATHS=(.env www logs services .git .version)
 while [[ $# -gt 0 ]]; do
-  # if the argument is the command name, skip it
-  if [[ "$1" == "${COMMAND_NAME}" ]]; then
-    shift
-    continue
-  fi
-
-  case "${1}" in
-  -h | --help)
-    need_help="true"
-    shift
-    ;;
-  -v | --version)
-    version_tag="${2}"
-    shift
-    shift
-    ;;
-  -f | --force)
-    force_upgrade="true"
-    shift
-    ;;
-  *)
-    messageUnknownCommand "$COMMAND_NAME" "$1"
-    exit 1
-    ;;
+  case "$1" in
+    -v | --version) require_option_value "$1" "${2:-}" || exit $?; VERSION_TAG="$2"; shift 2 ;;
+    -f | --force) FORCE_UPGRADE="true"; shift ;;
+    *) messageUnknownCommand upgrade "$1"; exit 2 ;;
   esac
 done
 
-# Execute post argument parsing checks
-finalize_argument_parsing
+installedVersion() { [[ ! -f "${VERSION_FILE}" ]] || head -n 1 "${VERSION_FILE}" | tr -d '[:space:]'; }
+latestVersion() {
+  local url tag
+  url="$(curl -fsSL -o /dev/null -w '%{url_effective}' "https://github.com/${REPOSITORY}/releases/latest")" || return 1
+  tag="${url##*/}"; case "${tag}" in v[0-9]*) printf '%s\n' "${tag}" ;; *) return 1 ;; esac
+}
+defaultBranch() {
+  local ref
+  ref="$(git -C "${STACK_DIR}" symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null)" || return 1
+  printf '%s\n' "${ref#origin/}"
+}
 
-#---------------------------RUN COMMAND-------------------------------#
-
-# Update the stack by downloading and unpacking the release archive
-upgradeFromArchive() {
-  isCurlInstalled
-  isTarInstalled
-
-  local current
-  current="$(getInstalledVersion)"
-
-  # Resolve the version to install
-  if [[ -z "${version_tag}" ]]; then
-    if ! version_tag="$(getLatestVersion)"; then
-      message --error "${MESSAGE_VERSION_NOT_RESOLVED}"
-      exit 1
-    fi
-  fi
-
-  # Check if the installed version is already the wanted one
-  if [[ "${current}" == "${version_tag}" ]] && [[ "${force_upgrade}" != "true" ]]; then
-    message --success "${MESSAGE_UPGRADE_UP_TO_DATE} (${current})"
-    return 0
-  fi
-
-  message --stack "${MESSAGE_UPGRADE_START}: ${current:-unknown} -> ${version_tag}"
-
-  # Unpack into a staging directory inside STACK_DIR
-  local staging="${STACK_DIR}/.stack-upgrade-$$"
-  rm -rf "${staging}"
-  mkdir -p "${staging}"
-  # shellcheck disable=SC2064
-  trap "rm -rf '${staging}'" EXIT
-
-  prompt -i "Downloading ${version_tag}..."
-  if ! curl -fsSL "https://github.com/${REPO}/archive/refs/tags/${version_tag}.tar.gz" 2> /dev/null |
-    tar -xzf - -C "${staging}" --strip-components=1 2> /dev/null; then
-    message --error "${MESSAGE_DOWNLOAD_FAILED}"
-    exit 1
-  fi
-
-  # Check the archive is complete
-  local entry
-  for entry in stack bin .docker; do
-    if [[ ! -e "${staging}/${entry}" ]]; then
-      message --error "${MESSAGE_ARCHIVE_INCOMPLETE}: '${entry}' is missing"
-      exit 1
-    fi
-  done
-
-  prompt -i "Creating backup..."
-
-  # Backup the core being replaced
-  local installed
-  installed="$(getInstalledVersion)"
-  local backup="${STACK_DIR}/.stack-backup-${installed:-unknown}-$(date +%Y%m%d-%H%M%S)"
+upgradeArchive() {
+  command -v curl >/dev/null 2>&1 || { prompt -e "curl non è installato."; return 1; }
+  command -v tar >/dev/null 2>&1 || { prompt -e "tar non è installato."; return 1; }
+  local current staging backup entry name
+  current="$(installedVersion)"
+  if [[ -z "${VERSION_TAG}" ]]; then VERSION_TAG="$(latestVersion)" || { prompt -e "Impossibile determinare l'ultima release."; return 1; }; fi
+  if [[ "${current}" == "${VERSION_TAG}" && "${FORCE_UPGRADE}" != "true" ]]; then prompt -s "Stack già aggiornato (${current})."; return; fi
+  staging="$(mktemp -d "${STACK_DIR}/.stack-upgrade.XXXXXX")" || return 1
+  STAGING="${staging}"; trap 'rm -rf -- "${STAGING:-}"' EXIT
+  prompt -i "Download di ${VERSION_TAG}..."
+  curl -fsSL "https://github.com/${REPOSITORY}/archive/refs/tags/${VERSION_TAG}.tar.gz" |
+    tar -xzf - -C "${staging}" --strip-components=1
+  for entry in stack bin .docker; do [[ -e "${staging}/${entry}" ]] || { prompt -e "Archivio incompleto: ${entry}"; return 1; }; done
+  backup="${STACK_DIR}/.stack-backup-${current:-unknown}-$(date +%Y%m%d-%H%M%S)"
   mkdir -p "${backup}"
-
-  prompt -i "Replacing the core..."
-
-  # Swap with mv only: overwriting in place would truncate the running stack
-  local name
   for entry in "${staging}"/* "${staging}"/.[!.]*; do
-    if [[ ! -e "${entry}" ]]; then
-      continue
-    fi
-
-    # Skip what belongs to the user
+    [[ -e "${entry}" ]] || continue
     name="$(basename "${entry}")"
-    if containsValue "${name}" "${PRESERVED_PATHS[@]}"; then
-      continue
-    fi
-
-    # Replace whole directories, so files removed upstream do not survive
-    if [[ -e "${STACK_DIR}/${name}" ]]; then
-      mv "${STACK_DIR}/${name}" "${backup}/${name}"
-    fi
+    containsValue "${name}" "${PRESERVED_PATHS[@]}" && continue
+    [[ ! -e "${STACK_DIR}/${name}" ]] || mv "${STACK_DIR}/${name}" "${backup}/${name}"
     mv "${entry}" "${STACK_DIR}/${name}"
   done
-
-  # Set the permissions
-  chmod +x "${STACK_DIR}/stack"
-  chmod +x "${STACK_DIR}"/bin/commands/*
-
-  # Save the installed version
-  echo "${version_tag}" > "${VERSION_FILE}"
-
-  message --success "${MESSAGE_UPGRADE_SUCCESS}"
+  chmod +x "${STACK_DIR}/stack" "${STACK_DIR}/boot.sh" "${STACK_DIR}"/bin/commands/*
+  printf '%s\n' "${VERSION_TAG}" >"${VERSION_FILE}"
+  prompt -s "Aggiornamento completato: ${VERSION_TAG}"
 }
 
-# Update the stack with git
-upgradeFromGit() {
-  isGitInstalled
-
+upgradeGit() {
+  command -v git >/dev/null 2>&1 || { prompt -e "git non è installato."; return 1; }
+  [[ -z "$(git -C "${STACK_DIR}" status --porcelain)" ]] || {
+    prompt -e "Il working tree contiene modifiche. Salvale o rimuovile prima dell'upgrade."
+    return 1
+  }
   local branch
   branch="$(git -C "${STACK_DIR}" rev-parse --abbrev-ref HEAD)"
-
-  if [[ -z "${version_tag}" ]] && [[ "${branch}" == "HEAD" ]]; then
-    if ! branch="$(getDefaultBranch)"; then
-      message --error "${MESSAGE_GIT_NO_BRANCH}"
-      exit 1
-    fi
-  fi
-
-  if [[ -n "${version_tag}" ]]; then
-    message --stack "${MESSAGE_UPGRADE_START}: tag '${version_tag}'"
+  git -C "${STACK_DIR}" fetch --tags --quiet
+  if [[ -n "${VERSION_TAG}" ]]; then
+    git -C "${STACK_DIR}" checkout --quiet "${VERSION_TAG}"
   else
-    message --stack "${MESSAGE_UPGRADE_START}: branch '${branch}'"
+    if [[ "${branch}" == "HEAD" ]]; then branch="$(defaultBranch)" || { prompt -e "Branch predefinito non determinabile."; return 1; }; fi
+    git -C "${STACK_DIR}" checkout --quiet "${branch}"
+    git -C "${STACK_DIR}" pull --ff-only --quiet
   fi
-
-  # Save local changes on top of the stash stack, leaving older stashes alone.
-  # Ignored files (.env, www, services, logs) are never stashed nor checked out
-  if [[ -n "$(git -C "${STACK_DIR}" status --porcelain)" ]]; then
-    git -C "${STACK_DIR}" stash push --include-untracked --quiet \
-      --message "stack upgrade"
-  fi
-
-  prompt -i "Fetching..."
-  if ! git -C "${STACK_DIR}" fetch --tags --quiet; then
-    message --error "${MESSAGE_FETCH_FAILED}"
-    exit 1
-  fi
-
-  if [[ -n "${version_tag}" ]]; then
-    if ! git -C "${STACK_DIR}" checkout --quiet "${version_tag}"; then
-      message --error "${MESSAGE_CHECKOUT_FAILED}"
-      exit 1
-    fi
-  else
-    if ! git -C "${STACK_DIR}" checkout --quiet "${branch}"; then
-      message --error "${MESSAGE_CHECKOUT_FAILED}"
-      exit 1
-    fi
-
-    # Pull the latest changes for the branch
-    if ! git -C "${STACK_DIR}" pull --ff-only --quiet; then
-      message --error "${MESSAGE_PULL_FAILED}"
-      exit 1
-    fi
-  fi
-
-  message --success "${MESSAGE_UPGRADE_SUCCESS}"
+  prompt -s "Aggiornamento Git completato."
 }
 
-upgrade() {
-  if isGitClone; then
-    upgradeFromGit
-  else
-    upgradeFromArchive
-  fi
-}
-
-# Run command if this file is the command file
-if [[ "${COMMAND_NAME}" == "${CURRENT_FILE_NAME}" ]]; then
-  upgrade
-fi
+if [[ -d "${STACK_DIR}/.git" ]]; then upgradeGit; else upgradeArchive; fi

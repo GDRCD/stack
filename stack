@@ -1,120 +1,95 @@
 #!/usr/bin/env bash
+# @cli.product: GDRCD
+# @cli.description: Orchestra l'ambiente di sviluppo locale per {product}
 
-# ---------------------------------------------------------------------
-# Interpreter
-# ---------------------------------------------------------------------
+set -Eeo pipefail
 
-# Check if the script is being run with bash
-if [ -z "${BASH_VERSION:-}" ]; then
-  echo "Error! This stack must be run with bash." >&2
-  echo "Run it directly ('./stack ...') so the shebang picks the right shell." >&2
+if [[ -z "${BASH_VERSION:-}" ]] || [[ "${BASH_VERSINFO[0]}" -lt 3 ]] || {
+  [[ "${BASH_VERSINFO[0]}" -eq 3 ]] && [[ "${BASH_VERSINFO[1]}" -lt 2 ]]
+}; then
+  printf '%s\n' "Error! Bash 3.2 or newer is required." >&2
   exit 1
 fi
 
-# Minimum bash version check (3.2, compatible with macOS)
-if [ "${BASH_VERSINFO[0]}" -lt 3 ] ||
-  { [ "${BASH_VERSINFO[0]}" -eq 3 ] && [ "${BASH_VERSINFO[1]}" -lt 2 ]; }; then
-  echo "Error! bash 3.2 or newer is required, found ${BASH_VERSION}." >&2
-  exit 1
-fi
-
-# ---------------------------------------------------------------------
-# Variables
-# ---------------------------------------------------------------------
-
-# Check on OS type for stack directory
-# Mac OS
-if [[ "$(uname)" == "Darwin" ]]; then
-  # check if greadlink is installed
-  if ! command -v greadlink &> /dev/null; then
-    echo "greadlink could not be found, please install it with 'brew install coreutils'"; exit 1
-  fi
-  readonly STACK_DIR="$(dirname "$(greadlink -m "${0}")")"
-# Windows
-elif [[ "$(expr substr "$(uname -s)" 1 10)" == "MINGW64_NT" ]]; then
-  readonly STACK_DIR="$(dirname "$(readlink -m "${0}")")"
-# Linux
-else
-  readonly STACK_DIR="$(dirname "$(readlink -m "${0}")")"
-fi
-source "${STACK_DIR}/bin/lib/lib-core.sh"
-
-# ---------------------------------------------------------------------
-# Import Libraries
-# ---------------------------------------------------------------------
-
-importLib "lib/lib-helpify.sh"
-importLib "lib/lib-messages.sh"
-
-importLib "lib/lib-services.sh"
-importLib "lib/lib-commands.sh"
-
-
-# -----------------------------------------------------------------------------
-# Helpers
-# -----------------------------------------------------------------------------
-
-usage () {
-  # show usage for all commands
-  need_commands_list="true"
-
-  # add logo
-  logo
-
-  echo;
-
-  helpify_title "" "[OPTIONS...] COMMAND [OPTIONS...]"
-  helpify_subtitle "It allows you to easily orchestrate the development stack for GDRCD"; echo;
-  helpify_subtitle "OPTIONS:"
-  helpify   "-h, --help"    "Show this help"
-  helpify_separator
-
-  #
-  usageCommands
-
-  echo;
+resolve_stack_entrypoint() {
+  local source_path="${BASH_SOURCE[0]}"
+  local source_dir
+  while [[ -L "${source_path}" ]]; do
+    source_dir="$(cd -P "$(dirname "${source_path}")" >/dev/null 2>&1 && pwd)"
+    source_path="$(readlink "${source_path}")"
+    [[ "${source_path}" != /* ]] && source_path="${source_dir}/${source_path}"
+  done
+  source_dir="$(cd -P "$(dirname "${source_path}")" >/dev/null 2>&1 && pwd)"
+  printf '%s/%s\n' "${source_dir}" "$(basename "${source_path}")"
 }
 
-# -----------------------------------------------------------------------------
-# Main
-# -----------------------------------------------------------------------------
+STACK_ENTRYPOINT="$(resolve_stack_entrypoint)"
+STACK_DIR="$(dirname "${STACK_ENTRYPOINT}")"
+STACK_COMMAND_NAME="$(basename "$0")"
+readonly STACK_ENTRYPOINT STACK_DIR STACK_COMMAND_NAME
+export STACK_ENTRYPOINT STACK_DIR STACK_COMMAND_NAME
 
-echo;
-
-# If no arguments are passed, show usage
-if [[ $# -eq 0 ]]; then
-  need_help="true";
-fi
-
-# Get environment variables
-isEnvFileExists
-# shellcheck disable=SC1090
-source "${STACK_DIR}/.env"
-
-# Parse arguments
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    -h|--help)
-      need_help="true"; shift ;;
-    -*|--*)
-      prompt -e "Error! Unrecognized stack option: ${1}";
-      has_any_error="true"; shift ;;
-    *)
-      # if is a valid command, run it
-      if isCommand "$1" ; then
-        # shellcheck source=bin
-        source "${COMMANDS_DIR}/$1";
-        exit 0;
-      # otherwise, if there is no other entries, show error
-      else
-        prompt -e "Error! Unrecognized stack command: ${*}"; has_any_error="true";
-        break;
-      fi
-      shift ;;
+STACK_PRODUCT_NAME=""
+STACK_DESCRIPTION=""
+while IFS= read -r metadata_line; do
+  case "${metadata_line}" in
+    '# @cli.product:'*) STACK_PRODUCT_NAME="${metadata_line#*: }" ;;
+    '# @cli.description:'*) STACK_DESCRIPTION="${metadata_line#*: }" ;;
   esac
-done
+done <"${STACK_ENTRYPOINT}"
+STACK_DESCRIPTION="${STACK_DESCRIPTION//\{product\}/${STACK_PRODUCT_NAME}}"
+readonly STACK_PRODUCT_NAME STACK_DESCRIPTION
+unset metadata_line
 
-# Execute post argument parsing checks
-finalize_argument_parsing
+# shellcheck source=bin/lib/lib-core.sh
+# shellcheck disable=SC1091 # STACK_DIR è risolto dinamicamente per supportare i symlink.
+source "${STACK_DIR}/bin/lib/lib-core.sh"
+importLib "lib/lib-helpify.sh"
+importLib "lib/lib-messages.sh"
+importLib "lib/lib-services.sh"
+importLib "lib/lib-command.sh"
+importLib "lib/lib-command-spec.sh"
 
-echo;
+usage() {
+  helpify_title "" "[OPTIONS...] COMMAND [OPTIONS...]"
+  helpify_subtitle "${STACK_DESCRIPTION}"
+  printf '\n'
+  helpify_subtitle "OPTIONS:"
+  helpify "-h, --help, help" "Mostra questo aiuto"
+  helpify_separator
+  usageCommands
+}
+
+load_environment() {
+  if [[ ! -f "${STACK_DIR}/.env" ]]; then
+    prompt -e "Error! '.env' non trovato. Copia sample.env e configuralo."
+    return 1
+  fi
+  # shellcheck source=/dev/null
+  source "${STACK_DIR}/.env"
+}
+
+dispatch_command() {
+  local command_name="$1"
+  local command_path="${COMMANDS_DIR}/${command_name}"
+  shift
+  if command_help_requested "$@"; then render_command_help "${command_name}"; return; fi
+  case "${command_name}" in completion | shell-init | cd | services) ;; *) load_environment ;; esac
+  # shellcheck source=/dev/null
+  source "${command_path}" "${command_name}" "$@"
+}
+
+main() {
+  if [[ $# -eq 0 ]]; then usage; return; fi
+  case "$1" in
+    __complete) shift; command_completion "$@"; return ;;
+    __validate-specs) validate_command_metadata; return ;;
+    -h | --help | help) usage; return ;;
+  esac
+  if isCommand "$1"; then dispatch_command "$@"; return; fi
+  prompt -e "Error! Comando non riconosciuto: $*"
+  prompt -i "Prova '${STACK_COMMAND_NAME} --help'."
+  return 2
+}
+
+main "$@"
