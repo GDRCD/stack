@@ -64,8 +64,15 @@ usage() {
   printf '\n'
   helpify_subtitle "OPTIONS:"
   helpify "-h, --help, help" "Mostra questo aiuto"
+  helpify "--version" "Mostra la versione installata"
   helpify_separator
   usageCommands
+}
+
+print_stack_version() {
+  local version
+  version="$(stackVersion)" || { prompt -e "Versione non determinabile."; return 1; }
+  printf '%s\n' "${version}"
 }
 
 load_environment() {
@@ -82,7 +89,7 @@ dispatch_command() {
   local command_path="${COMMANDS_DIR}/${command_name}"
   shift
   if command_help_requested "$@"; then render_command_help "${command_name}"; return; fi
-  case "${command_name}" in activate | cd | services) ;; *) load_environment ;; esac
+  case "${command_name}" in activate | cd | services | version) ;; *) load_environment ;; esac
   # shellcheck source=/dev/null
   source "${command_path}" "${command_name}" "$@"
 }
@@ -93,6 +100,7 @@ main() {
     __complete) shift; command_completion "$@"; return ;;
     __validate-specs) validate_command_metadata; return ;;
     -h | --help | help) usage; return ;;
+    --version) [[ $# -eq 1 ]] || { prompt -e "--version non accetta argomenti."; return 2; }; print_stack_version; return ;;
   esac
   if isCommand "$1"; then dispatch_command "$@"; return; fi
   prompt -e "Error! Comando non riconosciuto: $*"

@@ -69,3 +69,20 @@ canonicalize_path() {
   directory="$(cd -P "$(dirname "${path}")" >/dev/null 2>&1 && pwd)" || return 1
   printf '%s/%s\n' "${directory}" "$(basename "${path}")"
 }
+
+isReleaseVersion() {
+  [[ "$1" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]
+}
+
+stackVersion() {
+  local version
+  if [[ -e "${STACK_DIR}/.git" ]]; then
+    command -v git >/dev/null 2>&1 || return 1
+    git -C "${STACK_DIR}" describe --tags --always --dirty 2>/dev/null
+    return
+  fi
+  [[ -r "${STACK_DIR}/.version" ]] || return 1
+  version="$(head -n 1 "${STACK_DIR}/.version" | tr -d '[:space:]')"
+  isReleaseVersion "${version}" || return 1
+  printf '%s\n' "${version}"
+}

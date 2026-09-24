@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# @cli.summary: Mostra la versione installata
+# @cli.usage:
+
+shift
+[[ $# -eq 0 ]] || { messageUnknownCommand version "$1"; exit 2; }
+print_stack_version
