@@ -45,15 +45,13 @@ teardown() { teardown_test_environment; }
   [[ "$output" == *"phpmyadmin"* && "$output" == *"mailhog"* ]]
   run "${CLI_PATH}" __complete 1 clean -
   [[ "$output" == *"--volumes"* ]]
-  run "${CLI_PATH}" __complete 1 completion ""
+  run "${CLI_PATH}" __complete 1 activate ""
   [[ "$output" == *"bash"* && "$output" == *"zsh"* ]]
 }
 
 @test "generated Bash and Zsh integration is syntactically valid" {
-  run bash -c '"$1" completion bash | bash -n' _ "${CLI_PATH}"; [ "$status" -eq 0 ]
-  run bash -c '"$1" shell-init bash | bash -n' _ "${CLI_PATH}"; [ "$status" -eq 0 ]
-  run bash -c '"$1" completion zsh | zsh -n' _ "${CLI_PATH}"; [ "$status" -eq 0 ]
-  run bash -c '"$1" shell-init zsh | zsh -n' _ "${CLI_PATH}"; [ "$status" -eq 0 ]
+  run bash -c '"$1" activate bash | bash -n' _ "${CLI_PATH}"; [ "$status" -eq 0 ]
+  run bash -c '"$1" activate zsh | zsh -n' _ "${CLI_PATH}"; [ "$status" -eq 0 ]
 }
 
 @test "completion mirrors every declared option and enum" {

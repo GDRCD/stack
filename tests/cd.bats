@@ -9,8 +9,8 @@ teardown() { teardown_test_environment; }
   run "${CLI_PATH}" cd --root; [ "$status" -eq 0 ]; [ "$output" = "${PROJECT_ROOT}" ]
 }
 
-@test "generated hook changes the parent shell directory" {
-  run bash --noprofile --norc -c 'PATH="$1:$PATH"; source <("$2" shell-init bash); stack cd; pwd -P; stack cd --root; pwd -P' _ "${PROJECT_ROOT}" "${CLI_PATH}"
+@test "activation changes the parent shell directory" {
+  run bash --noprofile --norc -c 'source <("$1" activate bash); stack cd; pwd -P; stack cd --root; pwd -P' _ "${CLI_PATH}"
   [ "$status" -eq 0 ]
   [[ "$output" == *"${PROJECT_ROOT}/www"* ]]
   [[ "$output" == *"${PROJECT_ROOT}"* ]]
