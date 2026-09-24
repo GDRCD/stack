@@ -1,5 +1,36 @@
 # Changelog
 
+The current development entry follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [Semantic Versioning](https://semver.org/).
+
+## [4.0.0]
+
+### Breaking changes
+
+- Database commands no longer accept the redundant `database` argument. Use `stack export DATABASE`, `stack import DATABASE FILE`, and `stack refresh DATABASE`.
+- `clean` now preserves persistent volumes. Use `clean --volumes` to remove database data.
+- Shell integration is now static. Run `./stack install --force` after upgrading from an earlier version.
+
+### Added
+
+- Metadata-driven command help and Bash/Zsh completion.
+- Managed shell integration with `cd`, `install`, `uninstall`, `completion`, and `shell-init` commands.
+- Isolated Bats and ShellCheck test suite with Linux and macOS CI.
+- `build --force` and `clean --volumes` options.
+
+### Changed
+
+- Allow `enable` and `disable` to manage multiple optional services.
+- Use Docker build cache by default.
+- Move user documentation to the
+  [GDRCD documentation](https://docs.gdrcd.org/stack/panoramica).
+
+### Fixed
+
+- Preserve source dumps during compressed imports.
+- Preserve existing export destinations when an export fails.
+- Preserve argument spaces and shell-sensitive characters.
+- Use `PROJECT` for the installed command name, with `stack` as fallback.
+
 ## [3.0.0]
 
 Breaking release: the CLI is now flat and the `stack <service> <command>` form is gone. Scripts and aliases built on the old form need updating.
