@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# @cli.summary: Attiva PATH, completion e wrapper cd nella shell corrente
+# @cli.usage: SHELL
+# @cli.argument: SHELL | enum(bash,zsh) | required | Shell da configurare
+
+importLib "lib/lib-shell-integration.sh"
+shift
+[[ $# -eq 1 ]] || { prompt -e "Indica bash oppure zsh."; exit 2; }
+case "$1" in
+  bash | zsh) render_shell_activation "${STACK_COMMAND_NAME}" "$1" "$(dirname "${STACK_INVOKED_PATH}")" ;;
+  *) prompt -e "Shell non supportata: $1"; exit 2 ;;
+esac

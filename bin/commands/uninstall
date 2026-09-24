@@ -15,7 +15,7 @@ if [[ -L "${DESTINATION}" ]]; then
   RESOLVED="$(canonicalize_path "${DESTINATION}" 2>/dev/null || true)"
   [[ "${RESOLVED}" == "${STACK_ENTRYPOINT}" ]] || { prompt -e "Il link appartiene a un'altra installazione."; exit 1; }
 fi
-remove_shell_integration "${FINAL_NAME}" bash
-remove_shell_integration "${FINAL_NAME}" zsh
+remove_shell_integration "${FINAL_NAME}" bash "${TARGET}"
+remove_shell_integration "${FINAL_NAME}" zsh "${TARGET}"
 [[ ! -L "${DESTINATION}" ]] || rm -f -- "${DESTINATION}"
 prompt -s "Disinstallazione completata: ${FINAL_NAME}"
