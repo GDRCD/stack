@@ -2,6 +2,28 @@
 
 The current development entry follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [Semantic Versioning](https://semver.org/).
 
+## [4.1.0]
+
+### Breaking changes
+
+- The previous integration has been replaced with a more robust and user-friendly method. It is recommended to remove the existing hooks from `.bashrc`/`.zshrc` and then run `./stack install --activate --force` from the stack folder.
+
+### Added
+
+- Add `stack version` and `stack --version`, using Git metadata in development checkouts and `.version` in archive installations.
+
+### Changed
+
+- Make shell integration opt-in through `install --activate` and replace the generated startup block with a single `activate` invocation.
+- Use release archives for every upgrade, including Git checkouts, while preserving Git metadata and user data.
+- Validate release tags and archive contents before installation or upgrade, and roll back partial upgrades automatically.
+- Make `upgrade --force` reinstall the selected release consistently across installation types.
+
+### Removed
+
+- Remove the redundant `completion` and `shell-init` commands and the `--shell`, `--shell-hook`, and `--no-shell-hook` install options.
+- Remove migration and storage support for the legacy static shell hooks.
+
 ## [4.0.0]
 
 ### Breaking changes
