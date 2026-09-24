@@ -10,6 +10,7 @@ while [[ $# -gt 0 ]]; do
   case "$1" in -t | --target) require_option_value "$1" "${2:-}" || exit $?; TARGET="$2"; shift 2 ;; *) messageUnknownCommand uninstall "$1"; exit 2 ;; esac
 done
 FINAL_NAME="${PROJECT:-stack}"; DESTINATION="${TARGET}/${FINAL_NAME}"; RESOLVED=""
+validate_shell_integration_name "${FINAL_NAME}" || { prompt -e "Nome comando non valido: ${FINAL_NAME}"; exit 2; }
 if [[ -e "${DESTINATION}" && ! -L "${DESTINATION}" ]]; then prompt -e "Rifiuto di rimuovere un file non simbolico."; exit 1; fi
 if [[ -L "${DESTINATION}" ]]; then
   RESOLVED="$(canonicalize_path "${DESTINATION}" 2>/dev/null || true)"

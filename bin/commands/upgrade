@@ -7,8 +7,15 @@
 shift
 REPOSITORY="GDRCD/stack"
 VERSION_FILE="${STACK_DIR}/.version"
-VERSION_TAG=""; FORCE_UPGRADE="false"
-PRESERVED_PATHS=(.env www logs services .git .version)
+VERSION_TAG=""
+FORCE_UPGRADE="false"
+PRESERVED_PATHS=(.env www logs services .git)
+UPGRADE_STAGING=""
+UPGRADE_ROLLBACK=""
+UPGRADE_COMMITTED="false"
+UPGRADE_APPLIED=()
+UPGRADE_BACKED_UP=()
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -v | --version) require_option_value "$1" "${2:-}" || exit $?; VERSION_TAG="$2"; shift 2 ;;
@@ -17,62 +24,109 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-installedVersion() { [[ ! -f "${VERSION_FILE}" ]] || head -n 1 "${VERSION_FILE}" | tr -d '[:space:]'; }
+[[ -z "${VERSION_TAG}" ]] || isReleaseVersion "${VERSION_TAG}" || {
+  prompt -e "Tag di release non valido: ${VERSION_TAG}"
+  exit 2
+}
+
+installedVersion() {
+  local version
+  [[ -r "${VERSION_FILE}" ]] || return
+  version="$(head -n 1 "${VERSION_FILE}" | tr -d '[:space:]')"
+  isReleaseVersion "${version}" || return
+  printf '%s\n' "${version}"
+}
+
 latestVersion() {
-  local url tag
+  local url version
   url="$(curl -fsSL -o /dev/null -w '%{url_effective}' "https://github.com/${REPOSITORY}/releases/latest")" || return 1
-  tag="${url##*/}"; case "${tag}" in v[0-9]*) printf '%s\n' "${tag}" ;; *) return 1 ;; esac
-}
-defaultBranch() {
-  local ref
-  ref="$(git -C "${STACK_DIR}" symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null)" || return 1
-  printf '%s\n' "${ref#origin/}"
+  version="${url##*/}"
+  isReleaseVersion "${version}" || return 1
+  printf '%s\n' "${version}"
 }
 
-upgradeArchive() {
-  command -v curl >/dev/null 2>&1 || { prompt -e "curl non è installato."; return 1; }
-  command -v tar >/dev/null 2>&1 || { prompt -e "tar non è installato."; return 1; }
-  local current staging backup entry name
-  current="$(installedVersion)"
-  if [[ -z "${VERSION_TAG}" ]]; then VERSION_TAG="$(latestVersion)" || { prompt -e "Impossibile determinare l'ultima release."; return 1; }; fi
-  if [[ "${current}" == "${VERSION_TAG}" && "${FORCE_UPGRADE}" != "true" ]]; then prompt -s "Stack già aggiornato (${current})."; return; fi
-  staging="$(mktemp -d "${STACK_DIR}/.stack-upgrade.XXXXXX")" || return 1
-  STAGING="${staging}"; trap 'rm -rf -- "${STAGING:-}"' EXIT
-  prompt -i "Download di ${VERSION_TAG}..."
-  curl -fsSL "https://github.com/${REPOSITORY}/archive/refs/tags/${VERSION_TAG}.tar.gz" |
-    tar -xzf - -C "${staging}" --strip-components=1
-  for entry in stack bin .docker; do [[ -e "${staging}/${entry}" ]] || { prompt -e "Archivio incompleto: ${entry}"; return 1; }; done
-  backup="${STACK_DIR}/.stack-backup-${current:-unknown}-$(date +%Y%m%d-%H%M%S)"
-  mkdir -p "${backup}"
-  for entry in "${staging}"/* "${staging}"/.[!.]*; do
-    [[ -e "${entry}" ]] || continue
-    name="$(basename "${entry}")"
-    containsValue "${name}" "${PRESERVED_PATHS[@]}" && continue
-    [[ ! -e "${STACK_DIR}/${name}" ]] || mv "${STACK_DIR}/${name}" "${backup}/${name}"
-    mv "${entry}" "${STACK_DIR}/${name}"
-  done
-  chmod +x "${STACK_DIR}/stack" "${STACK_DIR}/boot.sh" "${STACK_DIR}"/bin/commands/*
-  printf '%s\n' "${VERSION_TAG}" >"${VERSION_FILE}"
-  prompt -s "Aggiornamento completato: ${VERSION_TAG}"
+validateRelease() {
+  local root="$1" commands=("$1"/bin/commands/*)
+  [[ -f "${root}/stack" && -f "${root}/boot.sh" && -f "${root}/sample.env" ]] || return 1
+  [[ -f "${root}/.docker/compose.yml" && -f "${commands[0]}" ]] || return 1
 }
 
-upgradeGit() {
-  command -v git >/dev/null 2>&1 || { prompt -e "git non è installato."; return 1; }
-  [[ -z "$(git -C "${STACK_DIR}" status --porcelain)" ]] || {
-    prompt -e "Il working tree contiene modifiche. Salvale o rimuovile prima dell'upgrade."
-    return 1
-  }
-  local branch
-  branch="$(git -C "${STACK_DIR}" rev-parse --abbrev-ref HEAD)"
-  git -C "${STACK_DIR}" fetch --tags --quiet
-  if [[ -n "${VERSION_TAG}" ]]; then
-    git -C "${STACK_DIR}" checkout --quiet "${VERSION_TAG}"
-  else
-    if [[ "${branch}" == "HEAD" ]]; then branch="$(defaultBranch)" || { prompt -e "Branch predefinito non determinabile."; return 1; }; fi
-    git -C "${STACK_DIR}" checkout --quiet "${branch}"
-    git -C "${STACK_DIR}" pull --ff-only --quiet
+cleanupUpgrade() {
+  local status=$? name index failed=""
+  trap - EXIT
+  set +e
+  if [[ "${UPGRADE_COMMITTED}" != "true" ]]; then
+    if [[ -n "${UPGRADE_STAGING}" && -d "${UPGRADE_STAGING}" ]]; then
+      failed="${UPGRADE_STAGING}/.failed"
+      mkdir -p "${failed}"
+    fi
+    for ((index=${#UPGRADE_APPLIED[@]} - 1; index >= 0; index--)); do
+      name="${UPGRADE_APPLIED[index]}"
+      [[ ! -e "${STACK_DIR}/${name}" && ! -L "${STACK_DIR}/${name}" ]] || mv -- "${STACK_DIR}/${name}" "${failed}/${name}"
+    done
+    for ((index=${#UPGRADE_BACKED_UP[@]} - 1; index >= 0; index--)); do
+      name="${UPGRADE_BACKED_UP[index]}"
+      [[ ! -e "${UPGRADE_ROLLBACK}/${name}" && ! -L "${UPGRADE_ROLLBACK}/${name}" ]] || mv -- "${UPGRADE_ROLLBACK}/${name}" "${STACK_DIR}/${name}"
+    done
   fi
-  prompt -s "Aggiornamento Git completato."
+  [[ -z "${UPGRADE_STAGING}" || ! -d "${UPGRADE_STAGING}" ]] || rm -rf -- "${UPGRADE_STAGING}"
+  [[ -z "${UPGRADE_ROLLBACK}" || ! -d "${UPGRADE_ROLLBACK}" ]] || rm -rf -- "${UPGRADE_ROLLBACK}"
+  exit "${status}"
 }
 
-if [[ -d "${STACK_DIR}/.git" ]]; then upgradeGit; else upgradeArchive; fi
+command -v curl >/dev/null 2>&1 || { prompt -e "curl non è installato."; exit 1; }
+command -v tar >/dev/null 2>&1 || { prompt -e "tar non è installato."; exit 1; }
+
+current="$(installedVersion)"
+if [[ -z "${VERSION_TAG}" ]]; then
+  VERSION_TAG="$(latestVersion)" || { prompt -e "Impossibile determinare l'ultima release."; exit 1; }
+fi
+if [[ "${current}" == "${VERSION_TAG}" && "${FORCE_UPGRADE}" != "true" ]]; then
+  prompt -s "Stack già aggiornato (${current})."
+  exit 0
+fi
+
+UPGRADE_STAGING="$(mktemp -d "${STACK_DIR}/.stack-upgrade.XXXXXX")" || exit 1
+trap cleanupUpgrade EXIT
+UPGRADE_ROLLBACK="$(mktemp -d "${STACK_DIR}/.stack-rollback.XXXXXX")" || exit 1
+
+prompt -i "Download di ${VERSION_TAG}..."
+if ! curl -fsSL "https://github.com/${REPOSITORY}/archive/refs/tags/${VERSION_TAG}.tar.gz" |
+  tar -xzf - -C "${UPGRADE_STAGING}" --strip-components=1; then
+  prompt -e "Impossibile scaricare o estrarre ${VERSION_TAG}."
+  exit 1
+fi
+validateRelease "${UPGRADE_STAGING}" || { prompt -e "L'archivio scaricato è incompleto."; exit 1; }
+printf '%s\n' "${VERSION_TAG}" >"${UPGRADE_STAGING}/.version"
+
+RELEASE_NAMES=()
+CORE_NAMES=()
+for entry in "${UPGRADE_STAGING}"/* "${UPGRADE_STAGING}"/.[!.]*; do
+  [[ -e "${entry}" || -L "${entry}" ]] || continue
+  name="$(basename "${entry}")"
+  containsValue "${name}" "${PRESERVED_PATHS[@]}" && continue
+  RELEASE_NAMES+=("${name}")
+  [[ "${name}" == ".version" ]] || CORE_NAMES+=("${name}")
+done
+
+if [[ -e "${STACK_DIR}/.git" ]]; then
+  command -v git >/dev/null 2>&1 || { prompt -e "git non è installato."; exit 1; }
+  if [[ ${#CORE_NAMES[@]} -gt 0 ]] &&
+    [[ -n "$(git -C "${STACK_DIR}" status --porcelain --untracked-files=all -- "${CORE_NAMES[@]}")" ]]; then
+    prompt -e "Il core contiene modifiche. Salvale o rimuovile prima dell'upgrade."
+    exit 1
+  fi
+fi
+
+for name in "${RELEASE_NAMES[@]}"; do
+  if [[ -e "${STACK_DIR}/${name}" || -L "${STACK_DIR}/${name}" ]]; then
+    mv -- "${STACK_DIR}/${name}" "${UPGRADE_ROLLBACK}/${name}"
+    UPGRADE_BACKED_UP+=("${name}")
+  fi
+  mv -- "${UPGRADE_STAGING}/${name}" "${STACK_DIR}/${name}"
+  UPGRADE_APPLIED+=("${name}")
+done
+
+chmod +x "${STACK_DIR}/stack" "${STACK_DIR}/boot.sh" "${STACK_DIR}"/bin/commands/*
+UPGRADE_COMMITTED="true"
+prompt -s "Aggiornamento completato: ${VERSION_TAG}"

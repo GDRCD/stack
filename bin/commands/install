@@ -1,26 +1,27 @@
 #!/usr/bin/env bash
-# @cli.summary: Installa il comando globale e l'integrazione shell
+# @cli.summary: Installa il comando globale
 # @cli.usage: [OPTIONS...]
 # @cli.option: -t, --target | directory | PATH | Directory di installazione
 # @cli.option: -f, --force | flag | | Sostituisce una precedente installazione dello stesso stack
-# @cli.option: --shell | enum(bash,zsh) | SHELL | Seleziona la shell da configurare
-# @cli.option: --shell-hook | flag | | Abilita esplicitamente l'integrazione shell
-# @cli.option: --no-shell-hook | flag | | Non modifica i file di avvio della shell
+# @cli.option: --activate | flag | | Attiva PATH, completion e cd nella shell predefinita
 
 importLib "lib/lib-shell-integration.sh"
 shift
-if [[ "$(id -u)" -eq 0 ]]; then TARGET_DEFAULT="/usr/local/bin"; INSTALL_HOOK="false"; else TARGET_DEFAULT="${HOME}/.local/bin"; INSTALL_HOOK="true"; fi
-TARGET="${TARGET_DEFAULT}"; FORCE="false"; TARGET_SHELL=""
+if [[ "$(id -u)" -eq 0 ]]; then TARGET_DEFAULT="/usr/local/bin"; else TARGET_DEFAULT="${HOME}/.local/bin"; fi
+TARGET="${TARGET_DEFAULT}"; FORCE="false"; ACTIVATE="false"; SHELL_NAME=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -t | --target) require_option_value "$1" "${2:-}" || exit $?; TARGET="$2"; shift 2 ;;
     -f | --force) FORCE="true"; shift ;;
-    --shell) require_option_value "$1" "${2:-}" || exit $?; case "$2" in bash | zsh) TARGET_SHELL="$2" ;; *) prompt -e "Shell non supportata: $2"; exit 2 ;; esac; INSTALL_HOOK="true"; shift 2 ;;
-    --shell-hook) INSTALL_HOOK="true"; shift ;;
-    --no-shell-hook) INSTALL_HOOK="false"; shift ;;
+    --activate) ACTIVATE="true"; shift ;;
     *) messageUnknownCommand install "$1"; exit 2 ;;
   esac
 done
+
+if [[ "${ACTIVATE}" == "true" ]]; then
+  SHELL_NAME="${SHELL##*/}"
+  case "${SHELL_NAME}" in bash | zsh) ;; *) prompt -e "Shell non supportata: ${SHELL_NAME:-sconosciuta}"; exit 2 ;; esac
+fi
 
 FINAL_NAME="${PROJECT:-stack}"
 validate_shell_integration_name "${FINAL_NAME}" || { prompt -e "Nome comando non valido: ${FINAL_NAME}"; exit 2; }
@@ -37,9 +38,7 @@ if [[ -e "${DESTINATION}" || -L "${DESTINATION}" ]]; then
 fi
 ln -s -- "${STACK_ENTRYPOINT}" "${DESTINATION}"
 
-if [[ "${INSTALL_HOOK}" == "true" ]]; then
-  SHELL_NAME="${TARGET_SHELL:-${SHELL##*/}}"
-  case "${SHELL_NAME}" in bash | zsh) ;; *) SHELL_NAME="bash" ;; esac
+if [[ "${ACTIVATE}" == "true" ]]; then
   install_shell_integration "${FINAL_NAME}" "${SHELL_NAME}" "${TARGET}"
   prompt -i "Integrazione ${SHELL_NAME} installata; apri una nuova shell."
 elif [[ ":${PATH}:" != *":${TARGET}:"* ]]; then

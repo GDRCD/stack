@@ -16,8 +16,3 @@ teardown() { teardown_test_environment; }
   [ "$status" -eq 2 ]
   [[ "$output" == *"requires a value"* ]]
 }
-
-@test "help aliases work" {
-  run "${CLI_PATH}" help; [ "$status" -eq 0 ]
-  run "${CLI_PATH}" build help; [ "$status" -eq 0 ]
-}

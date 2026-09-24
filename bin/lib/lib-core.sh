@@ -1,13 +1,6 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2034 # Constants are consumed by separately sourced modules.
 
-if [[ "${STACK_CORE_LOADED:-false}" == "true" ]]; then
-  return 0
-fi
-readonly STACK_CORE_LOADED="true"
-
-set -Eeo pipefail
-
 if [[ -z "${STACK_DIR:-}" ]]; then
   printf '%s\n' "Please define 'STACK_DIR' variable" >&2
   exit 1
@@ -75,4 +68,22 @@ canonicalize_path() {
   done
   directory="$(cd -P "$(dirname "${path}")" >/dev/null 2>&1 && pwd)" || return 1
   printf '%s/%s\n' "${directory}" "$(basename "${path}")"
+}
+
+isReleaseVersion() {
+  local core='(0|[1-9][0-9]*)' prerelease='((0|[1-9][0-9]*)|[0-9]*[A-Za-z-][0-9A-Za-z-]*)'
+  [[ "$1" =~ ^v${core}\.${core}\.${core}(-${prerelease}(\.${prerelease})*)?(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$ ]]
+}
+
+stackVersion() {
+  local version
+  if [[ -e "${STACK_DIR}/.git" ]]; then
+    command -v git >/dev/null 2>&1 || return 1
+    git -C "${STACK_DIR}" describe --tags --always --dirty 2>/dev/null
+    return
+  fi
+  [[ -r "${STACK_DIR}/.version" ]] || return 1
+  version="$(head -n 1 "${STACK_DIR}/.version" | tr -d '[:space:]')"
+  isReleaseVersion "${version}" || return 1
+  printf '%s\n' "${version}"
 }

@@ -1,8 +1,5 @@
 #!/usr/bin/env bash
 
-if [[ "${STACK_DOCKER_LOADED:-false}" == "true" ]]; then return 0; fi
-readonly STACK_DOCKER_LOADED="true"
-
 _STACK_DOCKER_READY="false"
 
 dockerPreflight() {
@@ -25,13 +22,13 @@ dockerCompose() {
   for service in "${OPTIONAL_SERVICES[@]}"; do
     isServiceEnabled "${service}" && profiles+=(--profile "${service}")
   done
-  export STACK_DIR
   docker compose -p "${PROJECT}" -f "${DOCKER_DIR}/compose.yml" \
     --env-file "${STACK_DIR}/.env" "${profiles[@]}" "$@"
 }
 
 isContainerExist() {
   local service="${1:-}" candidate
+  dockerPreflight
   if [[ -n "${service}" ]]; then
     [[ -n "$(dockerCompose ps -aq "${service}")" ]] || {
       prompt -e "Container del servizio '${service}' non trovato."
@@ -48,6 +45,7 @@ isContainerExist() {
 
 isContainerRunning() {
   local service="${1:-}" candidate
+  dockerPreflight
   if [[ -n "${service}" ]]; then
     [[ -n "$(dockerCompose ps -q "${service}")" ]] || {
       prompt -e "Container del servizio '${service}' non in esecuzione."

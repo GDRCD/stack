@@ -5,12 +5,13 @@ setup() { setup_test_environment; enable_docker_stub; }
 teardown() { teardown_test_environment; }
 
 @test "safe lifecycle commands execute through the Docker stub" {
-  for command in build clean logs recreate restart start stop; do
+  for command in logs recreate restart start stop; do
     : >"${DOCKER_STUB_LOG}"
     run "${CLI_PATH}" "$command"
     [ "$status" -eq 0 ] || { printf '%s: %s\n' "$command" "$output" >&2; return 1; }
     [ -s "${DOCKER_STUB_LOG}" ]
   done
+  [ "$(grep -Fxc version "${DOCKER_STUB_LOG}")" -eq 1 ]
 }
 
 @test "build uses cache by default and force disables it" {

@@ -1,8 +1,5 @@
 #!/usr/bin/env bash
 
-if [[ "${STACK_SERVICES_LOADED:-false}" == "true" ]]; then return 0; fi
-readonly STACK_SERVICES_LOADED="true"
-
 CORE_SERVICES=(webserver database)
 OPTIONAL_SERVICES=(phpmyadmin mailhog)
 SERVICE_DESCRIPTIONS=(
