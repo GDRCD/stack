@@ -1,154 +1,30 @@
 #!/usr/bin/env bash
+# @cli.summary: Importa un dump SQL in un database
+# @cli.usage: [OPTIONS...] DATABASE FILE
+# @cli.option: -f, --force-drop | flag | | Elimina e ricrea il database prima dell'import
+# @cli.argument: DATABASE | text | required | Nome del database
+# @cli.argument: FILE | file | required | Dump .sql o .sql.gz
 
 importLib "lib/lib-docker.sh"
-
-# ---------------------------------------------------------------------
-# Variables
-# ---------------------------------------------------------------------
-
-# Get current file name
-CURRENT_FILE_NAME="$(basename "${BASH_SOURCE[0]}")"
-
-# Save command name
-args=("$@")
-COMMAND_NAME="${args[0]}"
-
-# Commands variables
-SERVICE_NAME=""
-DATABASE_NAME=""
-FILE=""
-
-# If is set, drop schema before import
-need_fresh_import="false"
-
-# ---------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------
-
-# Function for showing usage of this command
-usage() {
-  helpify_title "import" "[OPTIONS...] database DATABASE_NAME FILE"
-  helpify_subtitle "Import a dump file (.sql, .sql.gz)"; echo;
-  helpify_subtitle "OPTIONS:"
-  helpify "-h, --help"          "Show this help"
-  helpify "-fd, --force-drop"   "Drop schema before import"
-}
-
-# Function for showing usage of this command for help
-usage4help() {
-  helpify "import"       "Import a dump file (.sql, .sql.gz)"
-}
-
-# ---------------------------------------------------------------------
-# Main
-# ---------------------------------------------------------------------
-
-#---------------------------PARSE ARGUMENTS-------------------------------#
-
-# Parse arguments
+shift
+FORCE_DROP="false"; DATABASE_NAME=""; FILE=""
 while [[ $# -gt 0 ]]; do
-  # if the argument is the command name, skip it
-  if [[ "$1" == "${COMMAND_NAME}" ]]; then
-    shift; continue
-  fi
-
-  #
   case "$1" in
-    -h|--help)
-      need_help="true"; shift;
-      ;;
-    -fd|--force-drop)
-      need_fresh_import="true"; shift;
-      ;;
-    *)
-    	# First argument is the service this command applies to
-    	if [[ -z "${SERVICE_NAME}" ]]; then
-    		SERVICE_NAME="$1"; shift;
-    	# Second argument is the database name
-    	elif [[ -z "${DATABASE_NAME}" ]]; then
-    		DATABASE_NAME="$1"; shift;
-      # Third argument is the file
-      elif [[ -z "${FILE}" ]]; then
-        FILE="$1"; shift;
-      # Other arguments are not allowed
-      else
-        messageUnknownCommand "${COMMAND_NAME}" "$1"; exit 1;
-      fi
-      ;;
+    -f | --force-drop) FORCE_DROP="true"; shift ;;
+    *) if [[ -z "${DATABASE_NAME}" ]]; then DATABASE_NAME="$1"; elif [[ -z "${FILE}" ]]; then FILE="$1"; else messageUnknownCommand import "$1"; exit 2; fi; shift ;;
   esac
 done
-
-# Execute post argument parsing checks
-finalize_argument_parsing
-
-#---------------------------RUN COMMAND-------------------------------#
-
-import() {
-  # Only the database service can be imported into
-  if [[ "${SERVICE_NAME}" != "database" ]]; then
-    prompt -e "Error! '${COMMAND_NAME}' only works with the 'database' service."
-    usage
-    exit 1
-  fi
-
-  # Preliminary checks
-  isContainerExist "${SERVICE_NAME}"
-  isContainerRunning "${SERVICE_NAME}"
-
-  # Check if database name is empty
-  if [[ -z "${DATABASE_NAME}" ]]; then
-  	prompt -e "Database name is required";
-  	exit 1;
-  fi
-
-  # Check if file is empty
-  if [[ -z "${FILE}" ]]; then
-  	prompt -e "File is required";
-  	exit 1;
-  fi
-
-  # Check if file exists
-  if [[ ! -f "${FILE}" ]]; then
-  	prompt -e "File '${FILE}' does not exist";
-  	exit 1;
-  fi
-
-  # Check if file is a dump file
-  if [[ ! "${FILE}" =~ \.(sql|sql\.gz)$ ]]; then
-  	prompt -e "File '${FILE}' is not a dump file";
-  	exit 1;
-  fi
-
-  # Check if file is a gzip file
-  if [[ "${FILE}" =~ \.gz$ ]]; then
-  	# Check if gzip is installed
-  	if ! command -v gzip &> /dev/null; then
-  		prompt -e "gzip is not installed";
-  		exit 1;
-  	fi
-  	# Check if gunzip is installed
-  	if ! command -v gunzip &> /dev/null; then
-  		prompt -e "gunzip is not installed";
-  		exit 1;
-  	fi
-  	# Unzip file
-  	prompt -i "Unzipping file..."
-  	gunzip "${FILE}" || exit 1
-  	# Remove .gz extension
-  	FILE="${FILE%.*}"
-  fi
-
-  # Drop schema if needed
-  if [[ "${need_fresh_import}" == "true" ]]; then
-    prompt -i "Dropping schema..."
-    docker exec -i "${PROJECT}"_database mysql -uroot -p"${MYSQL_ROOT_PASSWORD}" -e "DROP DATABASE IF EXISTS ${DATABASE_NAME}; CREATE DATABASE ${DATABASE_NAME};" || return 1
-  fi
-  # Import dump file
-  prompt -i "Importing dump file to ${DATABASE_NAME} ..."
-  docker exec -i "${PROJECT}"_database mysql -uroot -p"${MYSQL_ROOT_PASSWORD}" "${DATABASE_NAME}" < "${FILE}" || return 1
-}
-
-# Run command if this file is the command file
-if [[ "${COMMAND_NAME}" == "${CURRENT_FILE_NAME}" ]]; then
-  import
+[[ "${DATABASE_NAME}" =~ ^[[:alnum:]_]+$ ]] || { prompt -e "Nome database non valido."; exit 2; }
+[[ -f "${FILE}" && "${FILE}" =~ \.(sql|sql\.gz)$ ]] || { prompt -e "È richiesto un file .sql o .sql.gz esistente."; exit 2; }
+isContainerExist database; isContainerRunning database
+if [[ "${FORCE_DROP}" == "true" ]]; then
+  dockerCompose exec -T -e "MYSQL_PWD=${MYSQL_ROOT_PASSWORD}" database mysql -uroot \
+    -e "DROP DATABASE IF EXISTS \`${DATABASE_NAME}\`; CREATE DATABASE \`${DATABASE_NAME}\`;"
 fi
+prompt -i "Importazione di ${FILE} in ${DATABASE_NAME}..."
+if [[ "${FILE}" == *.gz ]]; then
+  gzip -dc -- "${FILE}" | dockerCompose exec -T -e "MYSQL_PWD=${MYSQL_ROOT_PASSWORD}" database mysql -uroot "${DATABASE_NAME}"
+else
+  dockerCompose exec -T -e "MYSQL_PWD=${MYSQL_ROOT_PASSWORD}" database mysql -uroot "${DATABASE_NAME}" <"${FILE}"
+fi
+prompt -s "Import completato."

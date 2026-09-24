@@ -1,102 +1,25 @@
 #!/usr/bin/env bash
+# @cli.summary: Elimina e ricrea un database vuoto
+# @cli.usage: [OPTIONS...] DATABASE
+# @cli.option: -y, --yes | flag | | Non chiede conferma
+# @cli.argument: DATABASE | text | required | Nome del database
 
 importLib "lib/lib-docker.sh"
-
-# ---------------------------------------------------------------------
-# Variables
-# ---------------------------------------------------------------------
-
-# Get current file name
-CURRENT_FILE_NAME="$(basename "${BASH_SOURCE[0]}")"
-
-# Save command name
-args=("$@")
-COMMAND_NAME="${args[0]}"
-
-# Commands variables
-SERVICE_NAME=""
-DATABASE_NAME=""
-
-# ---------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------
-
-# Function for showing usage of this command
-usage() {
-  helpify_title "refresh" "[OPTIONS...] database DATABASE_NAME"
-  helpify_subtitle "Clean all tables in the database"
-  helpify_subtitle "OPTIONS:"
-  helpify "-h, --help"          "Show this help"
-}
-
-# Function for showing usage of this command for help
-usage4help() {
-  helpify "refresh"       "Clean all tables in the database"
-}
-
-# ---------------------------------------------------------------------
-# Main
-# ---------------------------------------------------------------------
-
-#---------------------------PARSE ARGUMENTS-------------------------------#
-
-# Parse arguments
+shift
+ASSUME_YES="false"; DATABASE_NAME=""
 while [[ $# -gt 0 ]]; do
-  # if the argument is the command name, skip it
-  if [[ "$1" == "${COMMAND_NAME}" ]]; then
-    shift; continue
-  fi
-
-  #
   case "$1" in
-    -h|--help)
-      need_help="true"; shift;
-      ;;
-    *)
-    	# First argument is the service this command applies to
-    	if [[ -z "${SERVICE_NAME}" ]]; then
-    		SERVICE_NAME="$1"; shift;
-    	# Second argument is the database name
-    	elif [[ -z "${DATABASE_NAME}" ]]; then
-    		DATABASE_NAME="$1"; shift;
-      # Other arguments are not allowed
-      else
-        messageUnknownCommand "${COMMAND_NAME}" "$1"; exit 1;
-      fi
-      ;;
+    -y | --yes) ASSUME_YES="true"; shift ;;
+    *) [[ -z "${DATABASE_NAME}" ]] || { messageUnknownCommand refresh "$1"; exit 2; }; DATABASE_NAME="$1"; shift ;;
   esac
 done
-
-# Execute post argument parsing checks
-finalize_argument_parsing
-
-#---------------------------RUN COMMAND-------------------------------#
-
-refresh() {
-  # Only the database service can be refreshed
-  if [[ "${SERVICE_NAME}" != "database" ]]; then
-    prompt -e "Error! '${COMMAND_NAME}' only works with the 'database' service."
-    usage
-    exit 1
-  fi
-
-  # Preliminary checks
-  isContainerExist "${SERVICE_NAME}"
-  isContainerRunning "${SERVICE_NAME}"
-
-  # Check if database name is empty
-  if [[ -z "${DATABASE_NAME}" ]]; then
-  	prompt -e "Database name is required";
-  	exit 1;
-  fi
-
-  # Prompt
-  prompt -i "Refreshing database ${DATABASE_NAME}..."
-  # Run command
-  dockerCompose exec "${SERVICE_NAME}" sh -c "mysql -u root -p\${MYSQL_ROOT_PASSWORD} -e 'DROP DATABASE IF EXISTS ${DATABASE_NAME}; CREATE DATABASE ${DATABASE_NAME};'"
-}
-
-# Run command if this file is the command file
-if [[ "${COMMAND_NAME}" == "${CURRENT_FILE_NAME}" ]]; then
-  refresh
+[[ "${DATABASE_NAME}" =~ ^[[:alnum:]_]+$ ]] || { prompt -e "Nome database non valido."; exit 2; }
+if [[ "${ASSUME_YES}" != "true" ]]; then
+  [[ -t 0 ]] || { prompt -e "Usa --yes in un contesto non interattivo."; exit 2; }
+  read -r -p "Eliminare e ricreare '${DATABASE_NAME}'? [y/N] " CONFIRM
+  case "${CONFIRM}" in y | Y | yes | YES) ;; *) prompt -w "Operazione annullata."; exit 0 ;; esac
 fi
+isContainerExist database; isContainerRunning database
+dockerCompose exec -T -e "MYSQL_PWD=${MYSQL_ROOT_PASSWORD}" database mysql -uroot \
+  -e "DROP DATABASE IF EXISTS \`${DATABASE_NAME}\`; CREATE DATABASE \`${DATABASE_NAME}\`;"
+prompt -s "Database ${DATABASE_NAME} ricreato."

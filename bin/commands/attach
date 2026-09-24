@@ -1,92 +1,14 @@
 #!/usr/bin/env bash
+# @cli.summary: Apre una shell nel container di un servizio
+# @cli.usage: SERVICE
+# @cli.argument: SERVICE | service | required | Servizio a cui collegarsi
 
 importLib "lib/lib-docker.sh"
-
-# ---------------------------------------------------------------------
-# Variables
-# ---------------------------------------------------------------------
-
-# Get current file name
-CURRENT_FILE_NAME="$(basename "${BASH_SOURCE[0]}")"
-
-# Save command name
-args=("$@")
-COMMAND_NAME="${args[0]}"
-SERVICE_NAMES=()
-
-# ---------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------
-
-# Function for showing usage of this command
-usage() {
-  helpify_title "attach" "[OPTIONS...] <service>"
-  helpify_subtitle "Open a shell inside a container"; echo;
-  helpify_subtitle "OPTIONS:"
-  helpify "-h, --help" "Show this help"
-}
-
-# Function for showing usage of this command for help
-usage4help() {
-  helpify "attach" "Open a shell inside a container"
-}
-
-# ---------------------------------------------------------------------
-# Main
-# ---------------------------------------------------------------------
-
-#---------------------------PARSE ARGUMENTS-------------------------------#
-
-# Parse arguments
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-  "${COMMAND_NAME}")
-    shift
-    ;; # Skip the command name
-  -h | --help)
-    need_help="true"
-    shift
-    ;;
-  *)
-    if isServiceEnabled "$1"; then
-      SERVICE_NAMES+=("$1")
-      shift
-    else
-      messageUnknownCommand "$COMMAND_NAME" "$1"
-      exit 1
-    fi
-    ;;
-  esac
-done
-
-# Execute post argument parsing checks
-finalize_argument_parsing
-
-#---------------------------RUN COMMAND-------------------------------#
-
-attach() {
-  # Only one service can be attached to at a time
-  if [[ ${#SERVICE_NAMES[@]} -ne 1 ]]; then
-    if [[ ${#SERVICE_NAMES[@]} -eq 0 ]]; then
-      prompt -e "Error! '${COMMAND_NAME}' needs a service to attach to."
-    else
-      prompt -e "Error! '${COMMAND_NAME}' accepts a single service, got ${#SERVICE_NAMES[@]}."
-    fi
-    usage
-    exit 1
-  fi
-
-  SERVICE_NAME="${SERVICE_NAMES[0]}"
-
-  # Preliminary checks
-  isContainerExist "${SERVICE_NAME}"
-  isContainerRunning "${SERVICE_NAME}"
-  #
-  prompt -i "Attaching to ${SERVICE_NAME} container..."
-  dockerCompose exec -it "${SERVICE_NAME}" bash && return 0;
-}
-
-# Run command if this file is the command file
-if [[ "${COMMAND_NAME}" == "${CURRENT_FILE_NAME}" ]]; then
-  attach
-fi
+shift
+SERVICE_NAME="${1:-}"
+[[ $# -eq 1 ]] || { prompt -e "È richiesto esattamente un servizio."; exit 2; }
+isServiceEnabled "${SERVICE_NAME}" || { prompt -e "Servizio non abilitato: ${SERVICE_NAME}"; exit 2; }
+isContainerExist "${SERVICE_NAME}"
+isContainerRunning "${SERVICE_NAME}"
+prompt -i "Accesso al container ${SERVICE_NAME}..."
+dockerCompose exec -it "${SERVICE_NAME}" sh

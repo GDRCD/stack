@@ -1,27 +1,32 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# shellcheck disable=SC2154 # Color constants are defined by lib-core.sh.
 
-# ---------------------------------------------------------------------
-# Helpify
-# ---------------------------------------------------------------------
+if [[ "${STACK_HELPIFY_LOADED:-false}" == "true" ]]; then
+  return 0
+fi
+readonly STACK_HELPIFY_LOADED="true"
 
 helpify_title() {
-  local STACK_COMMAND_NAME="$(basename "${0}")"
-  printf "  ${c_cyan}%s${c_blue}%s ${c_blue}%s ${c_green}%s\n\n" "Usage: " "$STACK_COMMAND_NAME" "$1" "$2"
+  local command_name="${STACK_COMMAND_NAME:-$(basename "$0")}"
+  printf '  %bUsage: %b%s %b%s %b%s%b\n\n' \
+    "${c_cyan}" "${c_blue}" "${command_name}" "${c_blue}" "${1:-}" "${c_green}" "${2:-}" "${c_default}"
 }
 
 helpify_subtitle() {
-  printf "  ${c_cyan}%s\n${c_default}" "$1"
+  printf '  %b%s%b\n' "${c_cyan}" "${1:-}" "${c_default}"
 }
 
 helpify_subcommand_title() {
-  printf "  ${c_cyan}%s${c_red}%s ${c_red}%s ${c_green}%s\n\n${c_default}" "Usage: " "$1" "$2" "$3"
-  printf "  ${c_cyan}%s\n${c_default}" "COMMANDS:"
+  printf '  %bUsage: %b%s %s %b%s%b\n\n' \
+    "${c_cyan}" "${c_red}" "${1:-}" "${2:-}" "${c_green}" "${3:-}" "${c_default}"
+  helpify_subtitle "COMMANDS:"
 }
 
 helpify_separator() {
-  printf "\n"
+  printf '\n'
 }
 
 helpify() {
-  printf "    ${c_blue}%-20s ${c_green}%-60s ${c_magenta}%s\n${c_default}" "${1}" "${2}" "${3}"
+  printf '    %b%-20s %b%-60s %b%s%b\n' \
+    "${c_blue}" "${1:-}" "${c_green}" "${2:-}" "${c_magenta}" "${3:-}" "${c_default}"
 }

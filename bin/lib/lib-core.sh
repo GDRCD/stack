@@ -1,83 +1,78 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# shellcheck disable=SC2034 # Constants are consumed by separately sourced modules.
+
+if [[ "${STACK_CORE_LOADED:-false}" == "true" ]]; then
+  return 0
+fi
+readonly STACK_CORE_LOADED="true"
 
 set -Eeo pipefail
 
-# Check if STACK_DIR is set
-if [[ ! "${STACK_DIR}" ]]; then
-  echo "Please define 'STACK_DIR' variable"
+if [[ -z "${STACK_DIR:-}" ]]; then
+  printf '%s\n' "Please define 'STACK_DIR' variable" >&2
   exit 1
 fi
 
-# Libraries already imported
-PROCESS_SOURCE=()
+readonly BIN_DIR="${STACK_DIR}/bin"
+readonly COMMANDS_DIR="${BIN_DIR}/commands"
+readonly DOCKER_DIR="${STACK_DIR}/.docker"
+readonly WWW_DIR="${STACK_DIR}/www"
 
-# ---------------------------------------------------------------------
-# Variables
-# ---------------------------------------------------------------------
+if [[ -t 1 && -z "${NO_COLOR:-}" ]]; then
+  readonly c_default=$'\033[0m'
+  readonly c_blue=$'\033[1;34m'
+  readonly c_magenta=$'\033[1;35m'
+  readonly c_cyan=$'\033[1;36m'
+  readonly c_green=$'\033[1;32m'
+  readonly c_red=$'\033[1;31m'
+  readonly c_yellow=$'\033[1;33m'
+else
+  readonly c_default=""
+  readonly c_blue=""
+  readonly c_magenta=""
+  readonly c_cyan=""
+  readonly c_green=""
+  readonly c_red=""
+  readonly c_yellow=""
+fi
 
-#------------Directories--------------#
-BIN_DIR="${STACK_DIR}/bin"
-LIB_DIR="${STACK_DIR}/bin/lib"
-COMMANDS_DIR="${STACK_DIR}/bin/commands"
-DOCKER_DIR="${STACK_DIR}/.docker"
-
-#------------Decoration-----------#
-export c_default="\033[0m"
-export c_blue="\033[1;34m"
-export c_magenta="\033[1;35m"
-export c_cyan="\033[1;36m"
-export c_green="\033[1;32m"
-export c_red="\033[1;31m"
-export c_yellow="\033[1;33m"
-
-#------------Trigger-----------#
-need_help="false"
-need_commands_list="false"
-has_any_error="false"
-
-# Set the command name
-STACK_COMMAND_NAME="$(basename "${0}")"
-
-# ---------------------------------------------------------------------
-# Utilities
-# ---------------------------------------------------------------------
-
-# Check if a value is present in the given list (exact match)
-containsValue() {
-  local needle=$1; shift
-
-  for item in "$@"; do
-    if [[ "$item" == "$needle" ]]; then
-      return 0
-    fi
-  done
-
-  return 1
-}
-
-# Check if env file exists
-isEnvFileExists() {
-  if [[ ! -f "${STACK_DIR}/.env" ]]; then
-    prompt -e "Error! '.env' file is not found. Please create it first."
-    exit 1
-  fi
-}
-
-# ---------------------------------------------------------------------
-# Import Libraries
-# ---------------------------------------------------------------------
+_STACK_IMPORTED_LIBS=("lib/lib-core.sh")
 
 importLib() {
-  # Check if library exists
-  if [[ ! -f "${BIN_DIR}/${1}" ]]; then
-    prompt -e "Error! '${1}' is not found."
+  local library="${1:-}"
+  local imported
+
+  if [[ -z "${library}" || ! -f "${BIN_DIR}/${library}" ]]; then
+    printf "Error! Library '%s' was not found.\n" "${library}" >&2
     exit 1
   fi
 
-  # Check if library is already imported, if not import it
-  if ! containsValue "${1}" "${PROCESS_SOURCE[@]}"; then
-    # shellcheck source=bin/lib/lib-core.sh
-    source "${BIN_DIR}/${1}"
-    PROCESS_SOURCE+=("${1}")
+  for imported in "${_STACK_IMPORTED_LIBS[@]}"; do
+    [[ "${imported}" == "${library}" ]] && return 0
+  done
+
+  _STACK_IMPORTED_LIBS+=("${library}")
+  # shellcheck source=/dev/null
+  source "${BIN_DIR}/${library}"
+}
+
+require_option_value() {
+  local option="${1:-}"
+  local value="${2:-}"
+
+  if [[ -z "${value}" || "${value}" == -* ]]; then
+    prompt -e "Option '${option}' requires a value."
+    return 2
   fi
+}
+
+canonicalize_path() {
+  local path="$1" directory
+  while [[ -L "${path}" ]]; do
+    directory="$(cd -P "$(dirname "${path}")" >/dev/null 2>&1 && pwd)" || return 1
+    path="$(readlink "${path}")"
+    [[ "${path}" != /* ]] && path="${directory}/${path}"
+  done
+  directory="$(cd -P "$(dirname "${path}")" >/dev/null 2>&1 && pwd)" || return 1
+  printf '%s/%s\n' "${directory}" "$(basename "${path}")"
 }

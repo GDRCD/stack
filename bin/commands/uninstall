@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# @cli.summary: Rimuove comando e integrazione shell gestiti
+# @cli.usage: [OPTIONS...]
+# @cli.option: -t, --target | directory | PATH | Directory di installazione
+
+importLib "lib/lib-shell-integration.sh"
+shift
+if [[ "$(id -u)" -eq 0 ]]; then TARGET="/usr/local/bin"; else TARGET="${HOME}/.local/bin"; fi
+while [[ $# -gt 0 ]]; do
+  case "$1" in -t | --target) require_option_value "$1" "${2:-}" || exit $?; TARGET="$2"; shift 2 ;; *) messageUnknownCommand uninstall "$1"; exit 2 ;; esac
+done
+FINAL_NAME="${PROJECT:-stack}"; DESTINATION="${TARGET}/${FINAL_NAME}"; RESOLVED=""
+if [[ -e "${DESTINATION}" && ! -L "${DESTINATION}" ]]; then prompt -e "Rifiuto di rimuovere un file non simbolico."; exit 1; fi
+if [[ -L "${DESTINATION}" ]]; then
+  RESOLVED="$(canonicalize_path "${DESTINATION}" 2>/dev/null || true)"
+  [[ "${RESOLVED}" == "${STACK_ENTRYPOINT}" ]] || { prompt -e "Il link appartiene a un'altra installazione."; exit 1; }
+fi
+remove_shell_integration "${FINAL_NAME}" bash
+remove_shell_integration "${FINAL_NAME}" zsh
+[[ ! -L "${DESTINATION}" ]] || rm -f -- "${DESTINATION}"
+prompt -s "Disinstallazione completata: ${FINAL_NAME}"
