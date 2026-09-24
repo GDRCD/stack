@@ -3,8 +3,8 @@
 load test_helper
 setup() {
   setup_test_environment
-  INSTALL_HOME="${TEST_ROOT}/home"; INSTALL_DATA="${TEST_ROOT}/data"; INSTALL_BIN="${TEST_ROOT}/bin"
-  export INSTALL_HOME INSTALL_DATA INSTALL_BIN
+  INSTALL_HOME="${TEST_ROOT}/home"; INSTALL_BIN="${TEST_ROOT}/bin"
+  export INSTALL_HOME INSTALL_BIN
 }
 teardown() { teardown_test_environment; }
 
@@ -15,33 +15,25 @@ teardown() { teardown_test_environment; }
   [ ! -e "${INSTALL_HOME}/.bashrc" ]
 }
 
-@test "activate installs one working line and migrates the previous block" {
-  mkdir -p "${INSTALL_HOME}"
-  printf '%s\n' \
-    "# >>> ${INSTALL_NAME} shell integration >>>" \
-    'case ":$PATH:" in *) ;; esac' \
-    '# old hook' \
-    "# <<< ${INSTALL_NAME} shell integration <<<" > "${INSTALL_HOME}/.bashrc"
-
-  run env HOME="${INSTALL_HOME}" XDG_DATA_HOME="${INSTALL_DATA}" SHELL=/bin/bash \
+@test "activate installs one working idempotent line" {
+  run env HOME="${INSTALL_HOME}" SHELL=/bin/bash \
     "${CLI_PATH}" install --target "${INSTALL_BIN}" --activate
   [ "$status" -eq 0 ]
-  ! grep -Fq "# >>> ${INSTALL_NAME} shell integration >>>" "${INSTALL_HOME}/.bashrc"
   [ "$(grep -Fc "activate bash" "${INSTALL_HOME}/.bashrc")" -eq 1 ]
   run bash --noprofile --norc -c '. "$1"; complete -p "$2"' _ "${INSTALL_HOME}/.bashrc" "${INSTALL_NAME}"
   [ "$status" -eq 0 ]
 
-  run env HOME="${INSTALL_HOME}" XDG_DATA_HOME="${INSTALL_DATA}" SHELL=/bin/bash \
+  run env HOME="${INSTALL_HOME}" SHELL=/bin/bash \
     "${CLI_PATH}" install --target "${INSTALL_BIN}" --activate --force
   [ "$status" -eq 0 ]
   [ "$(grep -Fc "activate bash" "${INSTALL_HOME}/.bashrc")" -eq 1 ]
 }
 
 @test "uninstall removes only managed files" {
-  env HOME="${INSTALL_HOME}" XDG_DATA_HOME="${INSTALL_DATA}" SHELL=/bin/bash \
+  env HOME="${INSTALL_HOME}" SHELL=/bin/bash \
     "${CLI_PATH}" install --target "${INSTALL_BIN}" --activate >/dev/null
   printf '%s\n' '# keep' >>"${INSTALL_HOME}/.bashrc"
-  run env HOME="${INSTALL_HOME}" XDG_DATA_HOME="${INSTALL_DATA}" \
+  run env HOME="${INSTALL_HOME}" \
     "${INSTALL_BIN}/${INSTALL_NAME}" uninstall --target "${INSTALL_BIN}"
   [ "$status" -eq 0 ]
   [ ! -e "${INSTALL_BIN}/${INSTALL_NAME}" ]

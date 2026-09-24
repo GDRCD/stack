@@ -1,23 +1,17 @@
 #!/usr/bin/env bash
 
-if [[ "${STACK_COMMANDS_LOADED:-false}" == "true" ]]; then return 0; fi
-readonly STACK_COMMANDS_LOADED="true"
-
 isCommand() {
-  local path
-  if [[ "${1:-}" == "--abs-path" ]]; then path="${2:-}"; else path="${COMMANDS_DIR}/${1:-}"; fi
-  [[ -f "${path}" && -x "${path}" ]]
+  [[ -f "${COMMANDS_DIR}/${1:-}" && -x "${COMMANDS_DIR}/${1:-}" ]]
 }
 
 usageCommands() {
-  local command_path command_name summary
+  local command_path command_name
   helpify_subtitle "COMMANDS:"
   for command_path in "${COMMANDS_DIR}"/*; do
     [[ -f "${command_path}" && -x "${command_path}" ]] || continue
     command_name="${command_path##*/}"
     command_metadata_read "${command_path}" summary || continue
-    summary="${COMMAND_METADATA_VALUE//\{product\}/${STACK_PRODUCT_NAME}}"
-    helpify "${command_name}" "${summary}"
+    helpify "${command_name}" "${COMMAND_METADATA_VALUE}"
   done
 }
 

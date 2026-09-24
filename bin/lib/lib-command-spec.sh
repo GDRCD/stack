@@ -1,8 +1,5 @@
 #!/usr/bin/env bash
 
-if [[ "${STACK_COMMAND_SPEC_LOADED:-false}" == "true" ]]; then return 0; fi
-readonly STACK_COMMAND_SPEC_LOADED="true"
-COMMAND_METADATA_FILE=""
 COMMAND_METADATA_VALUE=""
 
 _metadata_trim() {
@@ -12,18 +9,8 @@ _metadata_trim() {
   printf '%s' "${value}"
 }
 
-command_metadata_resolve() {
-  local path="$1"
-  if [[ "${path}" == *" "* ]]; then
-    COMMAND_METADATA_FILE="${COMMANDS_DIR}/${path%% *}/${path#* }"
-  else
-    COMMAND_METADATA_FILE="${COMMANDS_DIR}/${path}"
-  fi
-}
-
 command_metadata_file() {
-  command_metadata_resolve "$1"
-  printf '%s\n' "${COMMAND_METADATA_FILE}"
+  printf '%s/%s\n' "${COMMANDS_DIR}" "$1"
 }
 
 command_metadata_read() {
@@ -55,25 +42,10 @@ command_metadata_records() {
 }
 
 command_spec_exists() {
-  command_metadata_resolve "$1"
-  [[ -f "${COMMAND_METADATA_FILE}" ]] || return 1
-  command_metadata_read "${COMMAND_METADATA_FILE}" summary || return 1
+  local file="${COMMANDS_DIR}/$1"
+  [[ -f "${file}" ]] || return 1
+  command_metadata_read "${file}" summary || return 1
   [[ -n "${COMMAND_METADATA_VALUE}" ]]
-}
-
-_command_metadata_expand() {
-  local value="$1" service="${2:-}"
-  value="${value//\{service\}/${service}}"
-  value="${value//\{product\}/${STACK_PRODUCT_NAME}}"
-  value="${value//\{home\}/${HOME}}"
-  printf '%s\n' "${value}"
-}
-
-command_spec_summary() {
-  local file summary
-  file="$(command_metadata_file "$1")"
-  summary="$(command_metadata_value "${file}" summary)"
-  _command_metadata_expand "${summary}" "${2:-}"
 }
 
 command_help_requested() {
@@ -86,17 +58,15 @@ command_help_requested() {
 }
 
 render_command_help() {
-  local spec_path="$1" display_path="${2:-$1}" service="${3:-}"
-  local file usage summary record names kind label description arguments_printed="false" notes_printed="false"
-  file="$(command_metadata_file "${spec_path}")"
+  local command_name="$1" file usage summary record names kind label description arguments_printed="false"
+  file="$(command_metadata_file "${command_name}")"
   [[ -f "${file}" ]] || {
-    prompt -e "No command metadata found for '${spec_path}'."
+    prompt -e "No command metadata found for '${command_name}'."
     return 1
   }
   usage="$(command_metadata_value "${file}" usage)"
-  [[ "${display_path}" != "${spec_path}" ]] && usage="[OPTIONS...]"
-  summary="$(command_spec_summary "${spec_path}" "${service}")"
-  helpify_title "${display_path}" "${usage}"
+  summary="$(command_metadata_value "${file}" summary)"
+  helpify_title "${command_name}" "${usage}"
   helpify_subtitle "${summary}"
 
   while IFS= read -r record; do
@@ -109,18 +79,8 @@ render_command_help() {
       helpify_subtitle "ARGUMENTS:"
       arguments_printed="true"
     fi
-    helpify "${names}" "$(_command_metadata_expand "${description}" "${service}")"
+    helpify "${names}" "${description}"
   done < <(command_metadata_records "${file}" argument)
-
-  while IFS= read -r record; do
-    [[ -n "${record}" ]] || continue
-    if [[ "${notes_printed}" != "true" ]]; then
-      printf '\n'
-      helpify_subtitle "NOTES:"
-      notes_printed="true"
-    fi
-    helpify "" "$(_command_metadata_expand "${record}" "${service}")"
-  done < <(command_metadata_records "${file}" note)
 
   printf '\n'
   helpify_subtitle "OPTIONS:"
@@ -132,7 +92,7 @@ render_command_help() {
     label="$(_metadata_trim "${label}")"
     description="$(_metadata_trim "${description}")"
     [[ -n "${label}" ]] && names="${names} ${label}"
-    helpify "${names}" "$(_command_metadata_expand "${description}" "${service}")"
+    helpify "${names}" "${description}"
   done < <(command_metadata_records "${file}" option)
 }
 
@@ -159,23 +119,6 @@ _command_completion_commands() {
     name="${path##*/}"
     [[ "${name}" == "${prefix}"* ]] && printf '%s\n' "${name}"
   done
-}
-
-command_argument_accepts_value() {
-  local command_path="$1" argument_name="$2" expected="$3" file record name kind values value
-  file="$(command_metadata_file "${command_path}")"
-  while IFS= read -r record; do
-    IFS='|' read -r name kind _ _ <<< "${record}"
-    name="$(_metadata_trim "${name}")"
-    kind="$(_metadata_trim "${kind}")"
-    [[ "${name}" == "${argument_name}" && "${kind}" == enum\(*\) ]] || continue
-    values="${kind#enum(}"
-    values="${values%)}"
-    values="${values//,/ }"
-    for value in ${values}; do [[ "${value}" == "${expected}" ]] && return 0; done
-    return 1
-  done < <(command_metadata_records "${file}" argument)
-  return 1
 }
 
 _command_option_alias_matches() {
@@ -212,7 +155,7 @@ command_completion() {
   fi
   spec_path="${first}"
   command_spec_exists "${spec_path}" || return 0
-  file="$(command_metadata_file "${spec_path}")"
+  file="${COMMANDS_DIR}/${spec_path}"
   relative=$((cursor - command_words))
   previous="${words[$((cursor - 1))]:-}"
   for word in "${words[@]:$command_words:$relative}"; do [[ "${word}" == "--" ]] && return 0; done

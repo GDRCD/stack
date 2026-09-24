@@ -1,13 +1,6 @@
 #!/usr/bin/env bash
 # shellcheck disable=SC2034 # Constants are consumed by separately sourced modules.
 
-if [[ "${STACK_CORE_LOADED:-false}" == "true" ]]; then
-  return 0
-fi
-readonly STACK_CORE_LOADED="true"
-
-set -Eeo pipefail
-
 if [[ -z "${STACK_DIR:-}" ]]; then
   printf '%s\n' "Please define 'STACK_DIR' variable" >&2
   exit 1
