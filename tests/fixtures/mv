@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+
+source_path=""
+for argument in "$@"; do
+  [[ "${argument}" == "--" ]] && continue
+  source_path="${argument}"
+  break
+done
+
+if [[ -n "${MV_STUB_FAIL_SOURCE:-}" && "${source_path}" == *"${MV_STUB_FAIL_SOURCE}" && ! -e "${MV_STUB_MARKER}" ]]; then
+  touch "${MV_STUB_MARKER}"
+  exit 1
+fi
+
+exec /bin/mv "$@"

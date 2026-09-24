@@ -10,7 +10,7 @@ test:
 		sh -eu -c 'apk add --no-cache bash bats git shellcheck zsh >/dev/null; \
 			rm -rf /tmp/gdrcd-stack-tests; \
 			mkdir -p /tmp/gdrcd-stack-tests/www /tmp/gdrcd-stack-tests/logs; \
-			cp -R /workspace/stack /workspace/boot.sh /workspace/bin /workspace/tests /workspace/sample.env /tmp/gdrcd-stack-tests/; \
+			cp -R /workspace/stack /workspace/boot.sh /workspace/bin /workspace/tests /workspace/.docker /workspace/sample.env /tmp/gdrcd-stack-tests/; \
 			printf "%s\n" \
 				"PROJECT=gdrcd-tests" \
 				"SERVICE_PORT=8080" \
