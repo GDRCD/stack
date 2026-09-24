@@ -1,0 +1,17 @@
+#!/usr/bin/env bats
+
+load test_helper
+setup() { setup_test_environment; }
+teardown() { teardown_test_environment; }
+
+@test "cd prints canonical www and root paths" {
+  run "${CLI_PATH}" cd; [ "$status" -eq 0 ]; [ "$output" = "${PROJECT_ROOT}/www" ]
+  run "${CLI_PATH}" cd --root; [ "$status" -eq 0 ]; [ "$output" = "${PROJECT_ROOT}" ]
+}
+
+@test "generated hook changes the parent shell directory" {
+  run bash --noprofile --norc -c 'PATH="$1:$PATH"; source <("$2" shell-init bash); stack cd; pwd -P; stack cd --root; pwd -P' _ "${PROJECT_ROOT}" "${CLI_PATH}"
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"${PROJECT_ROOT}/www"* ]]
+  [[ "$output" == *"${PROJECT_ROOT}"* ]]
+}

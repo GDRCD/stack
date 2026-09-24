@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+
+if [[ -n "${DOCKER_STUB_LOG:-}" ]]; then
+  { printf '%s\n' ---; printf '%s\n' "$@"; } >>"${DOCKER_STUB_LOG}"
+fi
+case " $* " in
+  *" compose version "* | *" info "* | *" network inspect "*) exit 0 ;;
+  *" network create "*) printf '%s\n' stub-network; exit 0 ;;
+esac
+if [[ " $* " == *" ps "* ]]; then printf '%s\n' stub-container-id; exit 0; fi
+if [[ " $* " == *" mysqldump "* ]]; then
+  [[ "${DOCKER_STUB_FAIL_MYSQLDUMP:-false}" != "true" ]] || exit 9
+  printf '%s\n' 'SELECT 1;'; exit 0
+fi
+if [[ " $* " == *" exec "* ]]; then command cat >/dev/null || true; fi

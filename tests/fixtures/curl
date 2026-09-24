@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+
+[[ -n "${CURL_STUB_ARCHIVE:-}" ]] || exit 1
+command cat "${CURL_STUB_ARCHIVE}"
