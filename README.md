@@ -25,8 +25,8 @@ git clone https://github.com/GDRCD/GDRCD.git www
 ```
 
 Il comando globale usa il valore `PROJECT` definito in `.env`; se non è
-impostato, usa `stack`. Apri una nuova shell dopo `./stack install` per
-attivare `PATH`, completion e `cd`.
+impostato, usa `stack`. Per attivare anche `PATH`, completion e `cd`, usa
+`./stack install --activate` e apri una nuova shell.
 
 ## Uso essenziale
 
