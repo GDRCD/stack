@@ -2,6 +2,12 @@
 
 The current development entry follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and [Semantic Versioning](https://semver.org/).
 
+## [4.1.1]
+
+### Changed
+
+- Speed up every invocation.
+
 ## [4.1.0]
 
 ### Breaking changes
