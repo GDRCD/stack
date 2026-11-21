@@ -11,38 +11,54 @@ if [[ -z "${BASH_VERSION:-}" ]] || [[ "${BASH_VERSINFO[0]}" -lt 3 ]] || {
   exit 1
 fi
 
+# dirname without a subprocess, stored in the variable named $1: path resolution runs on every
+# invocation, shell startup included through `activate`.
+assign_dirname() {
+  local directory="."
+  [[ "$2" == */* ]] && {
+    directory="${2%/*}"
+    directory="${directory:-/}"
+  }
+  printf -v "$1" '%s' "${directory}"
+}
+
 resolve_stack_entrypoint() {
   local source_path="${BASH_SOURCE[0]}"
   local source_dir
   while [[ -L "${source_path}" ]]; do
-    source_dir="$(cd -P "$(dirname "${source_path}")" >/dev/null 2>&1 && pwd)"
+    assign_dirname source_dir "${source_path}"
+    source_dir="$(cd -P "${source_dir}" >/dev/null 2>&1 && pwd)"
     source_path="$(readlink "${source_path}")"
     [[ "${source_path}" != /* ]] && source_path="${source_dir}/${source_path}"
   done
-  source_dir="$(cd -P "$(dirname "${source_path}")" >/dev/null 2>&1 && pwd)"
-  printf '%s/%s\n' "${source_dir}" "$(basename "${source_path}")"
+  assign_dirname source_dir "${source_path}"
+  source_dir="$(cd -P "${source_dir}" >/dev/null 2>&1 && pwd)"
+  printf '%s/%s\n' "${source_dir}" "${source_path##*/}"
 }
 
 resolve_stack_invocation() {
   local invoked_path="$0" invoked_dir
   [[ "${invoked_path}" == */* ]] || invoked_path="$(command -v -- "${invoked_path}")"
-  invoked_dir="$(cd -P "$(dirname "${invoked_path}")" >/dev/null 2>&1 && pwd)"
+  assign_dirname invoked_dir "${invoked_path}"
+  invoked_dir="$(cd -P "${invoked_dir}" >/dev/null 2>&1 && pwd)"
   printf '%s/%s\n' "${invoked_dir}" "${invoked_path##*/}"
 }
 
 STACK_ENTRYPOINT="$(resolve_stack_entrypoint)"
-STACK_DIR="$(dirname "${STACK_ENTRYPOINT}")"
-STACK_COMMAND_NAME="$(basename "$0")"
+assign_dirname STACK_DIR "${STACK_ENTRYPOINT}"
+STACK_COMMAND_NAME="${0##*/}"
 STACK_INVOKED_PATH="$(resolve_stack_invocation)"
 readonly STACK_ENTRYPOINT STACK_DIR STACK_COMMAND_NAME STACK_INVOKED_PATH
 export STACK_ENTRYPOINT STACK_DIR STACK_COMMAND_NAME STACK_INVOKED_PATH
 
 STACK_PRODUCT_NAME=""
 STACK_DESCRIPTION=""
+# Metadata lives in the leading comment block: stop at its end instead of reading the whole file
 while IFS= read -r metadata_line; do
+  [[ "${metadata_line}" == '#'* ]] || break
   case "${metadata_line}" in
-    '# @cli.product:'*) STACK_PRODUCT_NAME="${metadata_line#*: }" ;;
-    '# @cli.description:'*) STACK_DESCRIPTION="${metadata_line#*: }" ;;
+  '# @cli.product:'*) STACK_PRODUCT_NAME="${metadata_line#*: }" ;;
+  '# @cli.description:'*) STACK_DESCRIPTION="${metadata_line#*: }" ;;
   esac
 done <"${STACK_ENTRYPOINT}"
 STACK_DESCRIPTION="${STACK_DESCRIPTION//\{product\}/${STACK_PRODUCT_NAME}}"
@@ -71,7 +87,10 @@ usage() {
 
 print_stack_version() {
   local version
-  version="$(stackVersion)" || { prompt -e "Versione non determinabile."; return 1; }
+  version="$(stackVersion)" || {
+    prompt -e "Versione non determinabile."
+    return 1
+  }
   printf '%s\n' "${version}"
 }
 
@@ -88,21 +107,47 @@ dispatch_command() {
   local command_name="$1"
   local command_path="${COMMANDS_DIR}/${command_name}"
   shift
-  if command_help_requested "$@"; then render_command_help "${command_name}"; return; fi
+  if command_help_requested "$@"; then
+    render_command_help "${command_name}"
+    return
+  fi
   case "${command_name}" in activate | cd | services | version) ;; *) load_environment ;; esac
   # shellcheck source=/dev/null
   source "${command_path}" "${command_name}" "$@"
 }
 
 main() {
-  if [[ $# -eq 0 ]]; then usage; return; fi
+  if [[ $# -eq 0 ]]; then
+    usage
+    return
+  fi
   case "$1" in
-    __complete) shift; command_completion "$@"; return ;;
-    __validate-specs) validate_command_metadata; return ;;
-    -h | --help | help) usage; return ;;
-    --version) [[ $# -eq 1 ]] || { prompt -e "--version non accetta argomenti."; return 2; }; print_stack_version; return ;;
+  __complete)
+    shift
+    command_completion "$@"
+    return
+    ;;
+  __validate-specs)
+    validate_command_metadata
+    return
+    ;;
+  -h | --help | help)
+    usage
+    return
+    ;;
+  --version)
+    [[ $# -eq 1 ]] || {
+      prompt -e "--version non accetta argomenti."
+      return 2
+    }
+    print_stack_version
+    return
+    ;;
   esac
-  if isCommand "$1"; then dispatch_command "$@"; return; fi
+  if isCommand "$1"; then
+    dispatch_command "$@"
+    return
+  fi
   prompt -e "Error! Comando non riconosciuto: $*"
   prompt -i "Prova '${STACK_COMMAND_NAME} --help'."
   return 2

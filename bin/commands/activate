@@ -7,6 +7,6 @@ importLib "lib/lib-shell-integration.sh"
 shift
 [[ $# -eq 1 ]] || { prompt -e "Indica bash oppure zsh."; exit 2; }
 case "$1" in
-  bash | zsh) render_shell_activation "${STACK_COMMAND_NAME}" "$1" "$(dirname "${STACK_INVOKED_PATH}")" ;;
+  bash | zsh) render_shell_activation "${STACK_COMMAND_NAME}" "$1" "${STACK_INVOKED_PATH%/*}" ;;
   *) prompt -e "Shell non supportata: $1"; exit 2 ;;
 esac
